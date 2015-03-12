@@ -1,0 +1,12 @@
+echo $1 > $2
+./run_bfs_0streams 2 < $1 >> $2 
+cat stats.txt > bfs_stats.txt
+./run_bfs_1streams 2 < $1 >> $2 
+cat stats.txt >> bfs_stats.txt
+./run_bfs_2streams 2 < $1 >> $2 
+cat stats.txt >> bfs_stats.txt
+./run_bfs_4streams 2 < $1 >> $2 
+cat stats.txt >> bfs_stats.txt
+./run_bfs_8streams 2 < $1 >> $2
+cat stats.txt >> bfs_stats.txt
+echo "=========================" >> $2 

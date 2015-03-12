@@ -1,0 +1,119 @@
+Threshold: 16
+
+CONFIGURATION:
+- Graph file: ../../../datasets/DIMACS10/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 0
+Import graph:		5.692972
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.451531
+Generate inverted graph:		4.895102
+CUDA runtime initialization:		0.260581
+CUDA cudaMalloc:		0.001314
+CUDA H2D cudaMemcpy:		0.086722
+Process dangling nodes:		0.000004
+CUDA kernel execution:		0.624465
+CUDA D2H cudaMemcpy:		0.000827
+Threshold: 32
+
+CONFIGURATION:
+- Graph file: ../../../datasets/DIMACS10/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 0
+Import graph:		5.692629
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.467921
+Generate inverted graph:		4.895115
+CUDA runtime initialization:		0.270360
+CUDA cudaMalloc:		0.001321
+CUDA H2D cudaMemcpy:		0.086951
+Process dangling nodes:		0.000005
+CUDA kernel execution:		0.623917
+CUDA D2H cudaMemcpy:		0.000820
+Threshold: 64
+
+CONFIGURATION:
+- Graph file: ../../../datasets/DIMACS10/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 0
+Import graph:		5.693279
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.464653
+Generate inverted graph:		4.901564
+CUDA runtime initialization:		0.270218
+CUDA cudaMalloc:		0.001314
+CUDA H2D cudaMemcpy:		0.106307
+Process dangling nodes:		0.000004
+CUDA kernel execution:		0.623869
+CUDA D2H cudaMemcpy:		0.000731
+Threshold: 128
+
+CONFIGURATION:
+- Graph file: ../../../datasets/DIMACS10/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 0
+Import graph:		5.697954
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.443188
+Generate inverted graph:		4.904114
+CUDA runtime initialization:		0.259349
+CUDA cudaMalloc:		0.001295
+CUDA H2D cudaMemcpy:		0.083809
+Process dangling nodes:		0.000003
+CUDA kernel execution:		0.624176
+CUDA D2H cudaMemcpy:		0.000592
+Threshold: 256
+
+CONFIGURATION:
+- Graph file: ../../../datasets/DIMACS10/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 0
+Import graph:		5.701260
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.452329
+Generate inverted graph:		4.901905
+CUDA runtime initialization:		0.259549
+CUDA cudaMalloc:		0.001289
+CUDA H2D cudaMemcpy:		0.084114
+Process dangling nodes:		0.000003
+CUDA kernel execution:		0.624219
+CUDA D2H cudaMemcpy:		0.000598
+Threshold: 512
+
+CONFIGURATION:
+- Graph file: ../../../datasets/DIMACS10/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 0
+Import graph:		5.699308
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.441489
+Generate inverted graph:		4.900091
+CUDA runtime initialization:		0.269173
+CUDA cudaMalloc:		0.001299
+CUDA H2D cudaMemcpy:		0.084111
+Process dangling nodes:		0.000003
+CUDA kernel execution:		0.624101
+CUDA D2H cudaMemcpy:		0.000595
+Threshold: 1024
+
+CONFIGURATION:
+- Graph file: ../../../datasets/DIMACS10/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 0
+Import graph:		5.692620
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.441709
+Generate inverted graph:		4.899678
+CUDA runtime initialization:		0.260413
+CUDA cudaMalloc:		0.001291
+CUDA H2D cudaMemcpy:		0.086830
+Process dangling nodes:		0.000003
+CUDA kernel execution:		0.624478
+CUDA D2H cudaMemcpy:		0.000829

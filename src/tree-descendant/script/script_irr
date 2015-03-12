@@ -1,0 +1,32 @@
+./run_tree_irr 4 32 32 > log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 32 64 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 32 128 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 32 256 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 32 512 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 32 1024 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 64 64 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 64 128 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 64 256 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 64 512 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 4 64 1024 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 5 32 32 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 5 32 64 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 5 32 128 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 5 64 64 >> log_irr
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 5 64 128 >> log_irr
+cat stats_r.txt >> statistics_irr.txt

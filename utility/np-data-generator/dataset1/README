@@ -1,0 +1,2 @@
+
+./np-data-gen -l 1 -m 2000 -n 4000000 -d 1 -k 1.4 -e ./sns_like_1_2000_4M_1_4.txt 

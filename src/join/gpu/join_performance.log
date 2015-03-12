@@ -1,0 +1,71 @@
+Threshold: 256
+
+CONFIGURATION:
+- Graph file: ../../../data/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 0
+Import graph:		6.325500
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.555116
+CUDA runtime initialization:		3.322641
+CUDA cudaMalloc:		0.001212
+CUDA H2D cudaMemcpy:		0.130071
+CUDA kernel execution:		0.024433
+CUDA D2H cudaMemcpy:		0.002033
+
+CONFIGURATION:
+- Graph file: ../../../data/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 1
+Import graph:		6.319833
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.550086
+CUDA runtime initialization:		3.323013
+CUDA cudaMalloc:		0.001211
+CUDA H2D cudaMemcpy:		0.129702
+CUDA kernel execution:		0.024537
+CUDA D2H cudaMemcpy:		0.002028
+
+CONFIGURATION:
+- Graph file: ../../../data/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 2
+Import graph:		6.328438
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.547766
+CUDA runtime initialization:		3.316581
+CUDA cudaMalloc:		0.001194
+CUDA H2D cudaMemcpy:		0.124452
+CUDA kernel execution:		0.017226
+CUDA D2H cudaMemcpy:		0.001317
+
+CONFIGURATION:
+- Graph file: ../../../data/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 3
+Import graph:		6.321463
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.548758
+CUDA runtime initialization:		3.313196
+CUDA cudaMalloc:		0.001215
+CUDA H2D cudaMemcpy:		0.124784
+CUDA kernel execution:		0.019069
+CUDA D2H cudaMemcpy:		0.001236
+
+CONFIGURATION:
+- Graph file: ../../../data/coPapersCiteseer.graph
+- Graph format: 1
+- Solution: 5
+Import graph:		6.318487
+Node no: 434102
+Edge no: 32073440
+AdjList to CSR:		1.547628
+CUDA runtime initialization:		3.314174
+CUDA cudaMalloc:		0.001207
+CUDA H2D cudaMemcpy:		0.125601
+CUDA kernel execution:		0.019676
+CUDA D2H cudaMemcpy:		0.001314
