@@ -1,0 +1,16 @@
+./script_bfs /share/IPDPS2015_datasets/graph-dataset2/graph_50000_1_8.gr log/graph-datasets2/graph_50000_1_8.log
+cat stats.txt > log/graph50000.stats
+./script_bfs /share/IPDPS2015_datasets/graph-dataset2/graph_50000_8_8.gr log/graph-datasets2/graph_50000_8_8.log
+cat stats.txt >> log/graph50000.stats
+./script_bfs /share/IPDPS2015_datasets/graph-dataset2/graph_50000_32_32.gr log/graph-datasets2/graph_50000_32_32.log
+cat stats.txt >> log/graph50000.stats
+./script_bfs /share/IPDPS2015_datasets/graph-dataset2/graph_50000_32_256.gr log/graph-datasets2/graph_50000_32_256.log
+cat stats.txt >> log/graph50000.stats
+./script_bfs /share/IPDPS2015_datasets/graph-dataset2/graph_50000_32_1024.gr log/graph-datasets2/graph_50000_32_1024.log
+cat stats.txt >> log/graph50000.stats
+./script_bfs /share/IPDPS2015_datasets/graph-dataset2/graph_50000_64_64.gr log/graph-datasets2/graph_50000_64_64.log
+cat stats.txt >> log/graph50000.stats
+./script_bfs /share/IPDPS2015_datasets/graph-dataset2/graph_50000_64_256.gr log/graph-datasets2/graph_50000_64_256.log
+cat stats.txt >> log/graph50000.stats
+./script_bfs /share/IPDPS2015_datasets/graph-dataset2/graph_50000_64_1024.gr log/graph-datasets2/graph_50000_64_1024.log
+cat stats.txt >> log/graph50000.stats

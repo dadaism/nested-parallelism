@@ -14,11 +14,11 @@ CC_FLAGS = --compiler-options '-fopenmp' -arch=sm_35 -rdc=true -lcudadevrt -O2
 
 #CC_FLAGS += -DTHREASHOLD=400
 
-INC = -I./ -I../../../common
+INC = -I./ -I../../../../common
 
 all: global.o gpu-sssp
 
-global.o: ../../../common/global.cpp
+global.o: ../../../../common/global.cpp
 	${CC} ${FLAGS} ${INC} -c $^ -o $@
 gpu-sssp: global.o sssp.cpp sssp_wrapper.cu sssp_kernel.cu
 	$(CC) $(CC_FLAGS) ${INC} global.o sssp.cpp sssp_wrapper.cu -o $@

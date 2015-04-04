@@ -1,6 +1,6 @@
 #include "pagerank.h"
 
-#define N 10
+#define N 1
 
 using namespace std;
 

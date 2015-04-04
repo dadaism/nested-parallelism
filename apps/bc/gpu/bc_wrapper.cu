@@ -181,6 +181,7 @@ void bc_queue_gpu()
 	cudaCheckError( __LINE__, cudaMalloc( (void**)&d_queue_length, sizeof(unsigned int) ) );
 
 	for (int i=0; i<noNodeTotal; ++i) {
+	    if (i==50) break;
 		if (VERBOSE) {
 			if (i%1000==0) fprintf(stderr, "Processing node %d...\n", i);
 			//fprintf(stderr, "Processing node %d...\n", i);
@@ -271,6 +272,7 @@ void bc_dual_queue_gpu()
 	cudaCheckError( __LINE__, cudaMemcpy( &bp_queue_length_h, d_bp_queue_length_h, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
 	
 	for (int i=0; i<noNodeTotal; ++i) {
+	    if (i==50) break;
 		if (VERBOSE) {
 			if (i%1000==0) fprintf(stderr, "Processing node %d...\n", i);
 			//fprintf(stderr, "Processing node %d...\n", i);
@@ -397,6 +399,7 @@ void bc_shared_delayed_buffer_gpu()
 	cudaCheckError( __LINE__, cudaMalloc( (void**)&d_queue_length, sizeof(unsigned int) ) );
 
 	for (int i=0; i<noNodeTotal; ++i) {
+	    if (i==50) break;
 		if (VERBOSE) {
 			if (i%1000==0) fprintf(stderr, "Processing node %d...\n", i);
 			//fprintf(stderr, "Processing node %d...\n", i);
@@ -456,6 +459,7 @@ void bc_global_delayed_buffer_gpu()
 	cudaCheckError( __LINE__, cudaMalloc( (void**)&d_buffer_size, sizeof(unsigned int) ) );
 	
 	for (int i=0; i<noNodeTotal; ++i) {
+	    if (i==50) break;
 	//for (int i=0; i<5; ++i) {
 		if (VERBOSE) {
 			if (i%1000==0) fprintf(stderr, "Processing node %d...\n", i);
@@ -617,6 +621,7 @@ void bc_np_opt_gpu()
 	cudaCheckError( __LINE__, cudaMalloc( (void**)&d_buffer, sizeof(int)*GM_BUFF_SIZE ) );
 	
 	for (int i=0; i<noNodeTotal; ++i) {
+	    if (i==50) break;
 		if (VERBOSE) {
 			if (i%1000==0) fprintf(stderr, "Processing node %d...\n", i);
 			//fprintf(stderr, "Processing node %d...\n", i);

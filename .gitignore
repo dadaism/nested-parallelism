@@ -12,8 +12,12 @@ log/
 *.gr
 *.log
 *.dist
+*.out
 
 # binaries
 gpu-*
 *.o
 
+# project file
+*.cproject
+*.project

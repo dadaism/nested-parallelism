@@ -1,0 +1,2 @@
+./script_bfs /share/IPDPS2015_datasets/graph_50000_32_32_new.gr log/graph-datasets2/graph_50000_32_32_new.log
+cat bfs_stats.txt >> log/graph50000_new.stats

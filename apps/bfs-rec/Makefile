@@ -1,8 +1,6 @@
 all:
-	cd gpu; make;
-#	cd cpu; make;
+	cd src; make;
 
 
 clean:
-	cd gpu; make clean;
-#	cd cpu; make clean;
+	cd src; make clean;

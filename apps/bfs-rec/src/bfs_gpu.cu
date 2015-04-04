@@ -3,12 +3,32 @@
 #include "cuda_util.h"
 #include "util.h"
 
-#define PROFILE_GPU 1
+#ifndef PROFILE_GPU //used to record the number of kernel calls performed
+#define PROFILE_GPU 0
+#endif
 
+#ifndef THREADS_PER_BLOCK_FLAT //block size for flat parallelism
+#define THREADS_PER_BLOCK_FLAT 256 
+#endif
+
+#ifndef NUM_BLOCKS_FLAT //number of blocks for flat parallelism
+#define NUM_BLOCKS_FLAT 256
+#endif
+
+#ifndef THREADS_PER_BLOCK //block size
 #define THREADS_PER_BLOCK 32 
-#define NUM_BLOCKS 32
+#endif
 
-#ifdef PROFILE_GPU
+#ifndef NUM_BLOCKS //number of blocks
+#define NUM_BLOCKS 32
+#endif
+
+#ifndef STREAMS //number of streams
+#define STREAMS 0
+#endif 
+
+#if (PROFILE_GPU!=0)
+// records the number of kerbel calls performed
 __device__ unsigned nested_calls = 0;
 
 __global__ void gpu_statistics(unsigned solution){
@@ -20,8 +40,9 @@ __global__ void reset_gpu_statistics(){
 }
 #endif
 
-__global__ void bfs_kernel(unsigned level, node_t num_nodes, node_t *vertexArray, node_t *edgeArray, unsigned *levelArray, bool *queue_empty){
-#ifdef PROFILE_GPU
+// iterative, flat BFS traversal (note: synchronization-free implementation)
+__global__ void bfs_kernel_flat(unsigned level, node_t num_nodes, node_t *vertexArray, node_t *edgeArray, unsigned *levelArray, bool *queue_empty){
+#if (PROFILE_GPU!=0)
 	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
 #endif
 	unsigned tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -38,10 +59,17 @@ __global__ void bfs_kernel(unsigned level, node_t num_nodes, node_t *vertexArray
 	}	
 }
 
+// recursive naive NFS traversal
 __global__ void bfs_kernel_dp(node_t node, node_t *vertexArray, node_t *edgeArray, unsigned *levelArray){
-#ifdef PROFILE_GPU
+#if (PROFILE_GPU!=0)
 	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
 #endif
+
+#if (STREAMS!=0)
+	cudaStream_t s[STREAMS];
+	for (int i=0; i<STREAMS; ++i)  cudaStreamCreateWithFlags(&s[i], cudaStreamNonBlocking);	
+#endif
+
 	unsigned num_children = vertexArray[node+1]-vertexArray[node];
 	for (unsigned childp = threadIdx.x; childp < num_children; childp+=blockDim.x){ // may change this to use multiple blocks
 		if (childp < num_children){
@@ -53,16 +81,27 @@ __global__ void bfs_kernel_dp(node_t node, node_t *vertexArray, node_t *edgeArra
 				if (old_level == child_level){
 					unsigned num_grandchildren=vertexArray[child+1]-vertexArray[child];
 					unsigned block_size = min(num_grandchildren, THREADS_PER_BLOCK);
+#if (STREAMS!=0)
+				        if (block_size!=0) bfs_kernel_dp<<<1,block_size, 0, s[threadIdx.x%STREAMS]>>>(child, vertexArray, edgeArray, levelArray);
+#else
 				        if (block_size!=0) bfs_kernel_dp<<<1,block_size>>>(child, vertexArray, edgeArray, levelArray);
+
+#endif
 				}
 			}
 		}
 	}
 }
 
+// recursive hierarchical BFS traversal
 __global__ void bfs_kernel_dp_hier(node_t node, node_t *vertexArray, node_t *edgeArray, unsigned *levelArray){
-#ifdef PROFILE_GPU
+#if (PROFILE_GPU!=0)
 	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+#endif
+
+#if (STREAMS!=0)
+	cudaStream_t s[STREAMS];
+	for (int i=0; i<STREAMS; ++i)  cudaStreamCreateWithFlags(&s[i], cudaStreamNonBlocking);	
 #endif
 	__shared__ node_t child;
 	__shared__ unsigned child_level;
@@ -93,7 +132,11 @@ __global__ void bfs_kernel_dp_hier(node_t node, node_t *vertexArray, node_t *edg
 							unsigned old_level = atomicMin(&levelArray[grandchild],node_level+2);
 							if (old_level == grandchild_level){
 								unsigned num_grandgrandchildren = vertexArray[grandchild+1]-vertexArray[grandchild];
+#if (STREAMS!=0)
+								if (num_grandgrandchildren!=0) bfs_kernel_dp_hier<<<num_grandgrandchildren,THREADS_PER_BLOCK, 0, s[threadIdx.x%STREAMS]>>>(grandchild, vertexArray, edgeArray, levelArray);
+#else 
 								if (num_grandgrandchildren!=0) bfs_kernel_dp_hier<<<num_grandgrandchildren,THREADS_PER_BLOCK>>>(grandchild, vertexArray, edgeArray, levelArray);
+#endif
 							}
 						}
 					}
@@ -105,6 +148,9 @@ __global__ void bfs_kernel_dp_hier(node_t node, node_t *vertexArray, node_t *edg
 }
 
 void bfs_gpu(graph_t *graph, stats_t *stats){
+
+	printf("bfs_gpu invoked: using %d streams\n",STREAMS);
+	stats->streams=STREAMS;
 
 	double time;
 
@@ -131,7 +177,7 @@ void bfs_gpu(graph_t *graph, stats_t *stats){
 	// ----------------------------------------------------------
 	// version #1 - flat parallelism - level-based BFS traversal
 	// ----------------------------------------------------------
-#ifdef PROFILE_GPU
+#if (PROFILE_GPU!=0)
 	reset_gpu_statistics<<<1,1>>>();
 	cudaDeviceSynchronize();
 #endif
@@ -150,7 +196,7 @@ void bfs_gpu(graph_t *graph, stats_t *stats){
 	//level-based traversal
 	while (!queue_empty){
 		cudaCheckError(  __FILE__, __LINE__, cudaMemset( d_queue_empty, true, sizeof(bool)) );
-		bfs_kernel<<<256, 256>>>(level,graph->num_nodes, d_vertexArray, d_edgeArray, d_levelArray, d_queue_empty);
+		bfs_kernel_flat<<<NUM_BLOCKS_FLAT, THREADS_PER_BLOCK_FLAT>>>(level,graph->num_nodes, d_vertexArray, d_edgeArray, d_levelArray, d_queue_empty);
 		cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
 		cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( &queue_empty, d_queue_empty, sizeof(bool), cudaMemcpyDeviceToHost) );
 		level++;
@@ -159,7 +205,7 @@ void bfs_gpu(graph_t *graph, stats_t *stats){
 	stats->gpu_time=gettime_ms()-time; // end timing execution
 	printf("===> GPU #1 - flat parallelism: computation time = %.2f ms.\n", stats->gpu_time);
 	
-#ifdef PROFILE_GPU
+#if (PROFILE_GPU!=0)
 	gpu_statistics<<<1,1>>>(1);
 	cudaDeviceSynchronize();
 #endif
@@ -171,7 +217,7 @@ void bfs_gpu(graph_t *graph, stats_t *stats){
 	// ----------------------------------------------------------
 	// version #2 - dynamic parallelism - naive 
 	// ----------------------------------------------------------
-#ifdef PROFILE_GPU
+#if (PROFILE_GPU!=0)
 	reset_gpu_statistics<<<1,1>>>();
 	cudaDeviceSynchronize();
 #endif
@@ -183,15 +229,15 @@ void bfs_gpu(graph_t *graph, stats_t *stats){
 	
 	//recursive BFS traversal - naive
 	unsigned children = graph->vertexArray[graph->source+1]-graph->vertexArray[graph->source];
-
-	bfs_kernel_dp<<<1,children>>>(graph->source, d_vertexArray, d_edgeArray, d_levelArray);
+	unsigned block_size = min (children, THREADS_PER_BLOCK);
+	bfs_kernel_dp<<<1,block_size>>>(graph->source, d_vertexArray, d_edgeArray, d_levelArray);
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
 	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
 	
 	stats->gpu_time_np=gettime_ms()-time; //end timing execution
 	printf("===> GPU #2 - nested parallelism naive: computation time = %.2f ms.\n", stats->gpu_time_np);
 
-#ifdef PROFILE_GPU
+#if (PROFILE_GPU!=0)
 	gpu_statistics<<<1,1>>>(2);
 	cudaDeviceSynchronize();
 #endif
@@ -204,7 +250,7 @@ void bfs_gpu(graph_t *graph, stats_t *stats){
 	// ----------------------------------------------------------
 	// version #3 - dynamic parallelism - hierarchical
 	// ----------------------------------------------------------
-#ifdef PROFILE_GPU
+#if (PROFILE_GPU!=0)
 	reset_gpu_statistics<<<1,1>>>();
 	cudaDeviceSynchronize();
 #endif
@@ -223,7 +269,7 @@ void bfs_gpu(graph_t *graph, stats_t *stats){
 	stats->gpu_time_np_hier=gettime_ms()-time; //end timing execution
 	printf("===> GPU #3 - nested parallelism hierarchical: computation time = %.2f ms.\n", stats->gpu_time_np_hier);
 
-#ifdef PROFILE_GPU
+#if (PROFILE_GPU!=0)
 	gpu_statistics<<<1,1>>>(3);
 	cudaDeviceSynchronize();
 #endif
