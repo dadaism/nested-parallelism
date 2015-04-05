@@ -35,6 +35,7 @@ void usage() {
     fprintf(stderr, "                 3 - global dedayed buffer\n");
     fprintf(stderr, "                 4 - multiple dynamic parallelism per block\n");
     fprintf(stderr, "                 5 - single dynamic parallelism per block\n");
+    fprintf(stderr, "                 6 - workload consolidation with dynamic parallelism\n");
     fprintf(stderr, "    --device,-e <number>               select the device\n");
 }
 
