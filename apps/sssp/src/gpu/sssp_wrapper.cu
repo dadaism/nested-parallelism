@@ -9,6 +9,10 @@
 #define WARP_SIZE 32
 #define THREADS_PER_BLOCK 192
 
+#ifndef CONSOLIDATE_LEVEL
+#define CONSOLIDATE_LEVEL 1
+#endif
+
 #include "sssp_kernel.cu"
 
 //#define CONCURRENT_STREAM
@@ -470,24 +474,24 @@ void sssp_np_consolidate_gpu()
 			printf("Too many elements in queue\n");
 			exit(0);
 		}
-
+#if (CONSOLIDATE_LEVEL==0)
 		consolidate_warp_dp_kernel<<<dimGridT, dimBlockT>>>(d_vertexArray, d_edgeArray, d_costArray,
 															d_weightArray, d_update, noNodeTotal,
 															d_work_queue, d_queue_length, d_buffer);
+#elif (CONSOLIDATE_LEVEL==1)
 
-/*
 		consolidate_block_dp_kernel<<<dimGridT, dimBlockT>>>(d_vertexArray, d_edgeArray, d_costArray,
 															d_weightArray, d_update, noNodeTotal,
 															d_work_queue, d_queue_length, d_buffer);
-*/
-/*
+#elif (CONSOLIDATE_LEVEL==2)
+
 		cudaCheckError( __LINE__, cudaMemset(d_bSize, 0, sizeof(unsigned int)));
 		cudaCheckError( __LINE__, cudaMemset(d_count, 0, sizeof(unsigned int)));
 		consolidate_grid_dp_kernel<<<dimGridT, dimBlockT>>>(d_vertexArray, d_edgeArray, d_costArray,
 															d_weightArray, d_update, noNodeTotal,
 															d_work_queue, d_queue_length, d_buffer,
 															d_bSize, d_count);
-*/
+#endif
 		cudaCheckError( __LINE__, cudaMemset(d_queue_length, 0, sizeof(unsigned int)));
 		unorder_generateQueue_kernel<<<dimGrid, dimBlock>>>(d_update, noNodeTotal, d_work_queue,
 															d_queue_length, queue_max_length);

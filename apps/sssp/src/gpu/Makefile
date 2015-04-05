@@ -21,7 +21,7 @@ all: global.o gpu-sssp
 global.o: ../../../../common/global.cpp
 	${CC} ${FLAGS} ${INC} -c $^ -o $@
 gpu-sssp: global.o sssp.cpp sssp_wrapper.cu sssp_kernel.cu
-	$(CC) $(CC_FLAGS) ${INC} global.o sssp.cpp sssp_wrapper.cu -o $@
+	$(CC) -D'CONSOLIDATE_LEVEL=1' $(CC_FLAGS) ${INC} global.o sssp.cpp sssp_wrapper.cu -o $@
 
 clean:
 	rm *.o gpu-sssp*

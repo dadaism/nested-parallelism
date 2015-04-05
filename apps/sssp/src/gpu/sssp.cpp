@@ -1,6 +1,6 @@
 #include "sssp.h"
 
-#define N 1
+#define N 10
 
 using namespace std;
 
