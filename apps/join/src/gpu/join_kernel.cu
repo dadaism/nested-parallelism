@@ -76,7 +76,7 @@ __global__ void	join_bitmap_init_kernel( char *frontier, int node_num )
 		frontier[tid] = 1;
 }
 
-__global__ void	join_kernel( int *ptr, int *indices, FLOAT_T *data, FLOAT_T *x, FLOAT_T *y, int node_num )
+__global__ void	join_kernel( int *ptr, int *indices, short *data, short *x, short *y, short *z, int node_num )
 {
 	/* row == tid, each thread processes one row in sparse matrix */
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;	

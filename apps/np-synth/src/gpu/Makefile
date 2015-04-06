@@ -1,7 +1,7 @@
 CC = nvcc
 #CC_FLAGS = --compiler-options '-fopenmp' -Xptxas=-v -arch=sm_20 
 CC_FLAGS = --compiler-options '-fopenmp' -arch=sm_35 -rdc=true -lcudadevrt -O2 #-Xptxas=-v 
-INC = -I./ -I../../../common
+INC = -I./ -I../../../../common
 
 all: gpu-np-synth
 

@@ -1,5 +1,5 @@
-#ifndef __IR_SYNTH_H__
-#define __IR_SYNTH_H__
+#ifndef __BFS_SYNTH_H__
+#define __BFS_SYNTH_H__
 
 #include <stdio.h>
 #include <string.h>
@@ -21,6 +21,6 @@ typedef struct conf {
 
 extern CONF config;
 
-void IR_SYNTH_GPU();
+void BFS_SYNTH_GPU();
 
 #endif

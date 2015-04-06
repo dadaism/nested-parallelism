@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <cuda.h>
-#include "ir_synth.h"
+#include "bfs_synth.h"
 
 #define QMAXLENGTH 10240000
 #define GM_BUFF_SIZE 10240000
 
-#include "ir_synth_kernel.cu"
+#include "bfs_synth_kernel.cu"
 
 int *d_vertexArray;
 int *d_edgeArray;

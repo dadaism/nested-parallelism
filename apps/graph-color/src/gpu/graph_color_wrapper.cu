@@ -7,6 +7,10 @@
 
 #define WARP_SIZE 32
 
+#ifndef CONSOLIDATE_LEVEL
+#define CONSOLIDATE_LEVEL 1
+#endif
+
 #include "graph_color_kernel.cu"
 
 int *d_vertexArray;
@@ -457,18 +461,19 @@ void gclr_np_consolidate_gpu()
 			fprintf(stderr, "Too many elements in queue\n");
 			exit(0);
 		}
-//		gclr_consolidate_warp_dp_kernel<<<dimGridT, dimBlockT>>>(d_vertexArray, d_edgeArray, d_colorArray, color_type,
-//																	noNodeTotal, d_work_queue, d_queue_length, d_buffer);
-
+#if (CONSOLIDATE_LEVEL==0)
+		gclr_consolidate_warp_dp_kernel<<<dimGridT, dimBlockT>>>(d_vertexArray, d_edgeArray, d_colorArray, color_type,
+																	noNodeTotal, d_work_queue, d_queue_length, d_buffer);
+#elif (CONSOLIDATE_LEVEL==1)
 		gclr_consolidate_block_dp_kernel<<<dimGridT, dimBlockT>>>(d_vertexArray, d_edgeArray, d_colorArray, color_type,
 																noNodeTotal, d_work_queue, d_queue_length, d_buffer);
-
-/*		cudaCheckError( __LINE__, cudaMemset(d_buf_size, 0, sizeof(unsigned int)));
+#elif (CONSOLIDATE_LEVEL==2)
+		cudaCheckError( __LINE__, cudaMemset(d_buf_size, 0, sizeof(unsigned int)));
 		cudaCheckError( __LINE__, cudaMemset(d_count, 0, sizeof(unsigned int)));
 		gclr_consolidate_grid_dp_kernel<<<dimGridT, dimBlockT>>>(d_vertexArray, d_edgeArray, d_colorArray, color_type,
 																noNodeTotal, d_work_queue, d_queue_length, d_buffer,
 																d_buf_size, d_count);
-*/
+#endif
 		cudaCheckError( __LINE__, cudaMemset(d_queue_length, 0, sizeof(unsigned int)) );
 		gen_queue_workset_kernel<<<dimGrid, dimBlock>>>( d_colorArray, d_work_queue, d_queue_length, queue_max_length, noNodeTotal);
 		color_type++;

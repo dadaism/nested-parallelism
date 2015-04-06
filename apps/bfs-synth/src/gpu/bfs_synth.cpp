@@ -1,4 +1,4 @@
-#include "ir_synth.h"
+#include "bfs_synth.h"
 
 using namespace std;
 
@@ -6,7 +6,7 @@ CONF config;
 
 void usage() {
 	fprintf(stderr,"\n");
-	fprintf(stderr,"Usage:  gpu-ir-synth [option]\n");
+	fprintf(stderr,"Usage:  gpu-bfs-synth [option]\n");
 	fprintf(stderr, "\nOptions:\n");
 	fprintf(stderr, "    --help,-h      print this message\n");
 	fprintf(stderr, "    --verbose,-v   basic verbosity level\n");
@@ -19,9 +19,12 @@ void usage() {
 	fprintf(stderr, "                 1 - DIMACS10\n");
 	fprintf(stderr, "                 2 - SLNDC\n");
 	fprintf(stderr, "    --solution,-s <number>             specify the solution\n");
-	fprintf(stderr, "                 0 - Ordered + thread queue\n");
-	fprintf(stderr, "                 1 - Ordered + block bitmap\n");
-	fprintf(stderr, "                 2 - Ordered + block queue\n");
+	fprintf(stderr, "                 0 - unordered + thread queue\n");
+	fprintf(stderr, "                 1 - dual queue\n");
+	fprintf(stderr, "                 2 - shared delayed buffer\n");
+	fprintf(stderr, "                 3 - global delayed buffer\n");
+	fprintf(stderr, "                 4 - multiple dynamic parallelism per block\n");
+	fprintf(stderr, "                 5 - single dynamic parallelism per block\n");
 	fprintf(stderr, "    --device,-e <number>               select the device\n");
 }
 
@@ -130,7 +133,7 @@ int main(int argc, char* argv[])
 	printf("\n");
 	
 	/* IR-SYNTH on GPU */
-//	IR_SYNTH_GPU();
+	IR_SYNTH_GPU();
 	
 	clear();
 	return 0;

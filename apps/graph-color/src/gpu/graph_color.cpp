@@ -19,9 +19,14 @@ void usage() {
 	fprintf(stderr, "                 1 - DIMACS10\n");
 	fprintf(stderr, "                 2 - SLNDC\n");
 	fprintf(stderr, "    --solution,-s <number>             specify the solution\n");
-	fprintf(stderr, "                 0 - Ordered + thread queue\n");
-	fprintf(stderr, "                 1 - Ordered + block bitmap\n");
-	fprintf(stderr, "                 2 - Ordered + block queue\n");
+	fprintf(stderr, "                 0 - no pruning\n");
+	fprintf(stderr, "                 1 - unordered + thread queue\n");
+	fprintf(stderr, "                 2 - dual queue\n");
+	fprintf(stderr, "                 3 - shared delayed buffer\n");
+	fprintf(stderr, "                 4 - global delayed buffer\n");
+	fprintf(stderr, "                 5 - multiple dynamic parallelism per block\n");
+	fprintf(stderr, "                 6 - single dynamic parallelism per block\n");
+	fprintf(stderr, "                 7 - workload consolidation for dynamic parallelism\n");
 	fprintf(stderr, "    --device,-e <number>               select the device\n");
 }
 
