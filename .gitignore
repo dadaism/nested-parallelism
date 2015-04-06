@@ -13,9 +13,11 @@ log/
 *.log
 *.dist
 *.out
+*.swp
 
 # binaries
 gpu-*
+cpu-*
 *.o
 
 # project file
