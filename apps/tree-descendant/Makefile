@@ -1,5 +1,5 @@
 all:
-	cd gpu; make;
+	cd src; make;
 
 clean:
-	cd gpu; make clean;
+	cd src; make clean;
