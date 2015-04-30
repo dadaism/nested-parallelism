@@ -45,7 +45,7 @@ Precompiler Variables
 Currently the Makefile modifies the STREAMS variable, and generates multiple binaries: run_bfs_<STREAM>streams
 
 
-KNOWN PROBLEMS
+Know Problems
 ==============
 - Works well for type 2 datasets (real and synthetics)
 - Some problems with type 1 and 3 datasets

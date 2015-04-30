@@ -38,6 +38,17 @@ typedef struct __GRAPH__{
 	unsigned *levelArray_gpu_np_hier;
 } graph_t;
 
+typedef struct conf {
+	bool verbose;
+	bool debug;	
+	int data_set_format;
+	int solution;
+	int device_num;
+	char *graph_file;
+} CONF;
+
+extern CONF config;
+
 void bfs(graph_t *graph);
 
 void bfs_rec(graph_t *graph);

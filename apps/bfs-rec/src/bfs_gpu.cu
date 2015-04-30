@@ -40,6 +40,9 @@ __global__ void reset_gpu_statistics(){
 }
 #endif
 
+__device__ unsigned int gm_idx_pool[2000][1];
+__device__ unsigned int gm_buffer_pool[2000][5000];
+
 // iterative, flat BFS traversal (note: synchronization-free implementation)
 __global__ void bfs_kernel_flat(unsigned level, node_t num_nodes, node_t *vertexArray, node_t *edgeArray, unsigned *levelArray, bool *queue_empty){
 #if (PROFILE_GPU!=0)
@@ -72,22 +75,19 @@ __global__ void bfs_kernel_dp(node_t node, node_t *vertexArray, node_t *edgeArra
 
 	unsigned num_children = vertexArray[node+1]-vertexArray[node];
 	for (unsigned childp = threadIdx.x; childp < num_children; childp+=blockDim.x){ // may change this to use multiple blocks
-		if (childp < num_children){
-			node_t child = edgeArray[vertexArray[node]+childp];
-			unsigned node_level = levelArray[node];
-			unsigned child_level = levelArray[child];
-			if (child_level==UNDEFINED || child_level>(node_level+1)){
-				unsigned old_level = atomicMin(&levelArray[child],node_level+1);
-				if (old_level == child_level){
-					unsigned num_grandchildren=vertexArray[child+1]-vertexArray[child];
-					unsigned block_size = min(num_grandchildren, THREADS_PER_BLOCK);
+		node_t child = edgeArray[vertexArray[node]+childp];
+		unsigned node_level = levelArray[node];
+		unsigned child_level = levelArray[child];
+		if (child_level==UNDEFINED || child_level>(node_level+1)){
+			unsigned old_level = atomicMin(&levelArray[child],node_level+1);
+			if (old_level == child_level){
+				unsigned num_grandchildren=vertexArray[child+1]-vertexArray[child];
+				unsigned block_size = min(num_grandchildren, THREADS_PER_BLOCK);
 #if (STREAMS!=0)
-				        if (block_size!=0) bfs_kernel_dp<<<1,block_size, 0, s[threadIdx.x%STREAMS]>>>(child, vertexArray, edgeArray, levelArray);
+			        if (block_size!=0) bfs_kernel_dp<<<1,block_size, 0, s[threadIdx.x%STREAMS]>>>(child, vertexArray, edgeArray, levelArray);
 #else
-				        if (block_size!=0) bfs_kernel_dp<<<1,block_size>>>(child, vertexArray, edgeArray, levelArray);
-
+			        if (block_size!=0) bfs_kernel_dp<<<1,block_size>>>(child, vertexArray, edgeArray, levelArray);
 #endif
-				}
 			}
 		}
 	}
@@ -111,39 +111,78 @@ __global__ void bfs_kernel_dp_hier(node_t node, node_t *vertexArray, node_t *edg
 	unsigned num_children = vertexArray[node+1]-vertexArray[node];
 	
 	for (unsigned childp = blockIdx.x; childp < num_children; childp+=gridDim.x){
-		if (childp < num_children){
-			if (threadIdx.x==0){
-				child = edgeArray[vertexArray[node]+childp];
-				num_grandchildren = 0; // by default, due not continue
-				child_level = levelArray[child];
-				if (child_level==UNDEFINED || child_level>(node_level+1)){
-					unsigned old_level = atomicMin(&levelArray[child],node_level+1);
-					if (old_level == child_level)
-						num_grandchildren = vertexArray[child+1]-vertexArray[child];
-				}
+		if (threadIdx.x==0){
+			child = edgeArray[vertexArray[node]+childp];
+			num_grandchildren = 0; // by default, do not continue
+			child_level = levelArray[child];
+			if (child_level==UNDEFINED || child_level>(node_level+1)){
+				unsigned old_level = atomicMin(&levelArray[child],node_level+1);
+				if (old_level == child_level)
+					num_grandchildren = vertexArray[child+1]-vertexArray[child];
 			}
-			__syncthreads();
-			if (num_grandchildren != 0){
-				for (unsigned grandchild_p = threadIdx.x; grandchild_p < num_grandchildren; grandchild_p+=blockDim.x){
-					if (grandchild_p < num_grandchildren){
-						unsigned grandchild = edgeArray[vertexArray[child]+grandchild_p];
-						unsigned grandchild_level = levelArray[grandchild];
-						if (grandchild_level == UNDEFINED || grandchild_level > (node_level + 2)){
-							unsigned old_level = atomicMin(&levelArray[grandchild],node_level+2);
-							if (old_level == grandchild_level){
-								unsigned num_grandgrandchildren = vertexArray[grandchild+1]-vertexArray[grandchild];
+		}
+		__syncthreads();
+		if (num_grandchildren != 0){
+			for (unsigned grandchild_p = threadIdx.x; grandchild_p < num_grandchildren; grandchild_p+=blockDim.x){
+				unsigned grandchild = edgeArray[vertexArray[child]+grandchild_p];
+				unsigned grandchild_level = levelArray[grandchild];
+				if (grandchild_level == UNDEFINED || grandchild_level > (node_level + 2)){
+					unsigned old_level = atomicMin(&levelArray[grandchild],node_level+2);
+					if (old_level == grandchild_level){
+						unsigned num_grandgrandchildren = vertexArray[grandchild+1]-vertexArray[grandchild];
 #if (STREAMS!=0)
-								if (num_grandgrandchildren!=0) bfs_kernel_dp_hier<<<num_grandgrandchildren,THREADS_PER_BLOCK, 0, s[threadIdx.x%STREAMS]>>>(grandchild, vertexArray, edgeArray, levelArray);
+						if (num_grandgrandchildren!=0) 
+							bfs_kernel_dp_hier<<<num_grandgrandchildren,THREADS_PER_BLOCK, 0, s[threadIdx.x%STREAMS]>>>(grandchild, vertexArray, edgeArray, levelArray);
 #else 
-								if (num_grandgrandchildren!=0) bfs_kernel_dp_hier<<<num_grandgrandchildren,THREADS_PER_BLOCK>>>(grandchild, vertexArray, edgeArray, levelArray);
+						if (num_grandgrandchildren!=0) 
+							bfs_kernel_dp_hier<<<num_grandgrandchildren,THREADS_PER_BLOCK>>>(grandchild, vertexArray, edgeArray, levelArray);
 #endif
-							}
-						}
 					}
 				}
 			}
-			__syncthreads();
 		}
+		__syncthreads();
+	}
+}
+
+// recursive hierarchical BFS traversal
+__global__ void bfs_kernel_dp_cons(node_t *vertexArray, node_t *edgeArray, unsigned *levelArray, unsigned int *queue, unsigned int *queue_size, unsigned int *pool_idx) {
+#if (PROFILE_GPU!=0)
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+#endif
+	int bid = blockIdx.x; // 1-Dimensional grid configuration
+	int t_idx;
+	__shared__ int sh_idx;
+	node_t node = queue[bid];
+    if (threadIdx.x==0) {
+		sh_idx = atomicInc(pool_idx, 5000);
+	}
+	__syncthreads();
+	unsigned int *buffer = gm_buffer_pool[sh_idx];
+	unsigned int *buffer_size = gm_idx_pool[sh_idx];
+	unsigned num_children = vertexArray[node+1]-vertexArray[node];
+	for (unsigned childp = threadIdx.x; childp < num_children; childp+=blockDim.x) { 
+		node_t child = edgeArray[vertexArray[node]+childp];
+		unsigned node_level = levelArray[node];
+		unsigned child_level = levelArray[child];
+		if (child_level==UNDEFINED || child_level>(node_level+1)){
+			unsigned old_level = atomicMin(&levelArray[child], node_level+1);
+			if (old_level == child_level) {
+				unsigned num_grandchildren=vertexArray[child+1]-vertexArray[child];
+				if (num_grandchildren!=0) {
+					// insert into buffer
+					t_idx = atomicInc(buffer_size, 2000);
+					buffer[t_idx] = child;
+				}
+			}
+		}
+	}
+	__syncthreads();
+	if (threadIdx.x==0 && *buffer_size!=0) {
+		free(queue); free(queue_size);
+		bfs_kernel_dp_cons<<<*buffer_size, THREADS_PER_BLOCK>>>(vertexArray, 
+									 	edgeArray, levelArray, buffer, buffer_size,
+										pool_idx);
 	}
 }
 
@@ -156,8 +195,8 @@ void bfs_gpu(graph_t *graph, stats_t *stats){
 
 	//graph topology
 	node_t *d_vertexArray;
-        node_t *d_edgeArray;
-        unsigned *d_levelArray;
+	node_t *d_edgeArray;
+	unsigned *d_levelArray;
 
 	/* gpu allocation of vertex, edge and level array*/
 	time = gettime_ms();
@@ -269,6 +308,33 @@ void bfs_gpu(graph_t *graph, stats_t *stats){
 	stats->gpu_time_np_hier=gettime_ms()-time; //end timing execution
 	printf("===> GPU #3 - nested parallelism hierarchical: computation time = %.2f ms.\n", stats->gpu_time_np_hier);
 
+	// ----------------------------------------------------------
+	// version #4 - dynamic parallelism - consolidation
+	// ----------------------------------------------------------
+#if (PROFILE_GPU!=0)
+	reset_gpu_statistics<<<1,1>>>();
+	cudaDeviceSynchronize();
+#endif
+	
+	time = gettime_ms(); // start timing execution
+	
+	//copy the level array from CPU to GPU	
+	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( d_levelArray, graph->levelArray_gpu_np_hier, sizeof(unsigned)*(graph->num_nodes), cudaMemcpyHostToDevice) );
+
+	//recursive BFS traversal - dynamic parallelism consolidation
+	unsigned int **buffer;
+	unsigned int **buffer_size;
+	unsigned int **pool_idx;
+    //bfs_kernel_dp_cons_prepare<<<1,1>>>();
+    // graph->source in queue
+	children = graph->vertexArray[graph->source+1]-graph->vertexArray[graph->source];
+	bfs_kernel_dp_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
+										*buffer, *buffer_size, *pool_idx);
+	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
+	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
+	
+	stats->gpu_time_np_hier=gettime_ms()-time; //end timing execution
+	printf("===> GPU #4 - nested parallelism consolidation: computation time = %.2f ms.\n", stats->gpu_time_np_hier);
 #if (PROFILE_GPU!=0)
 	gpu_statistics<<<1,1>>>(3);
 	cudaDeviceSynchronize();
