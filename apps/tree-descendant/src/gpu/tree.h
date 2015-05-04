@@ -10,7 +10,7 @@
         fprunsignedf(stderr, "%s", msg);     \
         exit(0);
 
-typedef unsigned long long node_t;
+typedef unsigned node_t;
 
 typedef struct _TREE__{
 	node_t num_nodes;
@@ -28,7 +28,7 @@ typedef struct _TREE__{
 
 void gen_regular_tree(tree_t *tree, unsigned num_levels, unsigned outdegree);
 
-void gen_random_tree(tree_t *tree, unsigned num_levels, unsigned outdegree_min, unsigned outdegree_max);
+void gen_random_tree(tree_t *tree, unsigned level_min, unsigned level_max, unsigned outdegree_min, unsigned outdegree_max, unsigned possibility);
 
 void tree_to_dot(tree_t tree, FILE *file);
 

@@ -5,6 +5,8 @@
 
 typedef struct __STATS__ {
 	unsigned levels;
+        unsigned level_min;
+        unsigned level_max;
 	unsigned outdegree;
 	unsigned outdegree_min;
 	unsigned outdegree_max;

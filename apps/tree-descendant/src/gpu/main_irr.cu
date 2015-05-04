@@ -20,22 +20,27 @@ int main(int argc, char *argv[])
     	init_device(DEVICE);
 	double time;
 	tree_t tree;
-	if (argc < 4){
-		printf ("usage: ./run_tree NUM_LEVELS, OUTDEGRE_MIN, OUTDEGREE_MAX\n");
+	if (argc < 5){
+		printf ("usage: ./run_tree DEPTH_MIN, DEPTH_MAX, OUTDEGRE_MIN, OUTDEGREE_MAX, POSSIBILITY of descendants\n");
 		return(-1);
 	}
-	unsigned num_levels = atoi(argv[1]);
-	unsigned outdegree_min  =  atoi(argv[2]);
-	unsigned outdegree_max  =  atoi(argv[3]);
-	char *filename = "test/tree.dot";	
+	unsigned level_min  = atoi(argv[1]);
+        unsigned level_max  = atoi(argv[2]);
+        unsigned outdegree_min  =  atoi(argv[3]);
+        unsigned outdegree_max  =  atoi(argv[4]);
+        char *filename = "test/tree.dot";
+        unsigned possi=3;
+        if(6==argc) possi = atoi(argv[5]);
 	
-	printf("\n===MAIN=== :: [levels,outdegree_min,outdegree_max] = %u, %u, %u\n", num_levels, outdegree_min, outdegree_max);
+        printf("\n===MAIN=== :: [depth_min,depth_max,outdegree_min,outdegree_max,possibility] = %u, %u, %u, %u, %u\n", level_min,level_max, outdegree_min, outdegree_max, possi);
 
-	gen_random_tree(&tree, num_levels, outdegree_min, outdegree_max);
+        gen_random_tree(&tree, level_min, level_max, outdegree_min, outdegree_max, possi);
 
 	printf("nodes=%llu\n",tree.num_nodes);
 
-	stats.levels=num_levels;
+	stats.levels=level_max;
+        stats.level_min=level_min;
+        stats.level_max=level_max;
 	stats.outdegree_min=outdegree_min;
 	stats.outdegree_max=outdegree_max;
 	stats.num_nodes=tree.num_nodes;	

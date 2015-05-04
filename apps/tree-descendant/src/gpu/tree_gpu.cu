@@ -7,14 +7,23 @@
 
 #ifdef PROFILE_GPU
 __device__ unsigned nested_calls = 0;
+__device__ unsigned long long sync_times=0;
+__device__ unsigned long long sync_times_hier=0;
 
 __global__ void gpu_statistics(unsigned solution){
 	printf("====> GPU #%u - number of nested kernel calls:%u\n",solution, nested_calls);
+}
+__global__ void gpu_sync_statistics(unsigned solution){
+        printf("====> GPU #%u - number of sync times:%llu\n",solution, sync_times);
+}
+__global__ void gpu_sync_statistics_hier(unsigned solution){
+        printf("====> GPU #%u - number of sync times:%llu\n",solution, sync_times_hier);
 }
 
 __global__ void reset_gpu_statistics(){
 	nested_calls = 0;
 }
+
 #endif
 
 __global__ void descendants_kernel(node_t num_nodes, node_t *vertexArray, node_t *parentArray, node_t *edgeArray, node_t *descendantArray){
@@ -22,6 +31,9 @@ __global__ void descendants_kernel(node_t num_nodes, node_t *vertexArray, node_t
 	for (node_t node = tid; node < num_nodes; node +=blockDim.x * gridDim.x){
 		for (node_t parent = parentArray[node]; parent != (node_t) -1; parent = parentArray[parent]){
 			atomicAdd(&descendantArray[parent],1);
+			#ifdef PROFILE_GPU
+                        atomicAdd(&sync_times,1);
+                        #endif
 		}
 	}	
 	
@@ -70,6 +82,7 @@ __global__ void descendants_kernel_dp_hier(node_t node, node_t *vertexArray, nod
 						if (num_grandgrandchildren!=0) recurse = true;
 					}
 				}
+				__syncthreads();
 				if (threadIdx.x==0){
 					if (recurse){
 						descendants_kernel_dp_hier<<<64, 64>>> (child, vertexArray, parentArray, edgeArray, descendantArray);
@@ -77,8 +90,14 @@ __global__ void descendants_kernel_dp_hier(node_t node, node_t *vertexArray, nod
 					}else descendantArray[child]+=num_grandchildren;
 				}
 			}
-			__syncthreads();
-			if (threadIdx.x==0)atomicAdd(&descendantArray[node], descendantArray[child]);
+			//__syncthreads();
+			if (threadIdx.x==0) {
+				atomicAdd(&descendantArray[node], descendantArray[child]);
+				#ifdef PROFILE_GPU
+                                atomicAdd(&sync_times_hier,1);
+                                #endif
+
+			}
 		}
 	}
 }
@@ -120,6 +139,10 @@ void descendants_gpu(tree_t *tree, stats_t *stats){
 	time = gettime_ms();
 	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( tree->descendantArray_gpu, d_descendantArray, sizeof(int)*tree->num_nodes, cudaMemcpyDeviceToHost) );
 	printf("mem copy to CPU time = %.2f ms.\n", gettime_ms()-time);
+#ifdef PROFILE_GPU
+        gpu_sync_statistics<<<1,1>>>(1);
+        cudaDeviceSynchronize();
+#endif
 
 	//version #2 - dynamic parallelism
 	cudaDeviceSetLimit(cudaLimitDevRuntimeSyncDepth, 8);
@@ -158,28 +181,7 @@ void descendants_gpu(tree_t *tree, stats_t *stats){
 
 #ifdef PROFILE_GPU
 	gpu_statistics<<<1,1>>>(3);
-	cudaDeviceSynchronize();
-#endif
-	time = gettime_ms();
-	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( tree->descendantArray_gpu_np_hier, d_descendantArray, sizeof(int)*tree->num_nodes, cudaMemcpyDeviceToHost) );
-	printf("mem copy to CPU time = %.2f ms.\n", gettime_ms()-time);
-
-	//version #4 - dynamic parallelism with consolidation
-	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( d_descendantArray, tree->descendantArray_gpu_np_hier, sizeof(node_t )*(tree->num_nodes), cudaMemcpyHostToDevice) );
-	cudaDeviceSynchronize();
-#ifdef PROFILE_GPU
-	reset_gpu_statistics<<<1,1>>>();
-#endif
-	cudaDeviceSynchronize();
-
-	time = gettime_ms();
-	descendants_kernel_dp_hier<<<children, children>>>(0, d_vertexArray, d_parentArray, d_edgeArray, d_descendantArray);
-	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
-	stats->gpu_time_np_hier=gettime_ms()-time;
-	printf("===> GPU #3 - hierarchical nested parallelism: computation time = %.2f ms.\n", stats->gpu_time_np_hier);
-
-#ifdef PROFILE_GPU
-	gpu_statistics<<<1,1>>>(3);
+	gpu_sync_statistics_hier<<<1,1>>>(3);
 	cudaDeviceSynchronize();
 #endif
 	time = gettime_ms();

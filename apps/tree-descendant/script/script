@@ -1,0 +1,33 @@
+./run_tree_irr 1 4 32 32 0	> log_irr
+cat log_irr >> log_irr.txt
+cat stats_r.txt >> statistics_irr.txt
+./run_tree_irr 1 4 64 64 0	> log_irr
+cat stats_r.txt >> statistics_irr.txt
+cat log_irr >> log_irr.txt
+./run_tree_irr 1 4 128 128 0	> log_irr
+cat stats_r.txt >> statistics_irr.txt
+cat log_irr >> log_irr.txt
+./run_tree_irr 1 4 256 256 0	> log_irr
+cat stats_r.txt >> statistics_irr.txt
+cat log_irr >> log_irr.txt
+./run_tree_irr 1 4 512 512 0	> log_irr
+cat stats_r.txt >> statistics_irr.txt
+cat log_irr >> log_irr.txt
+
+
+./run_tree_irr 1 4 512 512 0	> log_irr
+cat stats_r.txt >> statistics_irr.txt
+cat log_irr >> log_irr.txt
+./run_tree_irr 1 4 512 512 1	> log_irr
+cat stats_r.txt >> statistics_irr.txt
+cat log_irr >> log_irr.txt
+./run_tree_irr 1 4 512 512 2	> log_irr
+cat stats_r.txt >> statistics_irr.txt
+cat log_irr >> log_irr.txt
+./run_tree_irr 1 4 512 512 3	> log_irr
+cat stats_r.txt >> statistics_irr.txt
+cat log_irr >> log_irr.txt
+./run_tree_irr 1 4 512 512 4	> log_irr
+cat stats_r.txt >> statistics_irr.txt
+cat log_irr >> log_irr.txt
+

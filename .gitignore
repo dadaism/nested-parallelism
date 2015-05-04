@@ -19,6 +19,7 @@ log/
 gpu-*
 cpu-*
 *.o
+run_tree*
 
 # project file
 *.cproject

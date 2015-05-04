@@ -49,35 +49,78 @@ void gen_regular_tree(tree_t *tree, unsigned num_levels, unsigned outdegree){
 
 inline unsigned randint(unsigned lo, unsigned hi) { return lo + ((unsigned)rand() % (hi + 1 - lo)); } //random
 
-void gen_random_tree(tree_t *tree, unsigned num_levels, unsigned outdegree_min, unsigned outdegree_max){
+void gen_random_tree(tree_t *tree, unsigned height_min, unsigned height_max, unsigned outdegree_min, unsigned outdegree_max, unsigned possibility){
 
 	srand(0);
 
-	node_t max_nodes = 0;	
-	for (unsigned level=0; level<num_levels;level++){
-		max_nodes += pow(outdegree_max,level) ;
-	}
-	//printf("max nodes = %llu \n",max_nodes);
+	unsigned max_nodes = 280000000; //maximum size of array that can be put on a K20 GPU	
+//	for (unsigned level=0; level<height_max; level++){
+//		max_nodes += pow(outdegree_max,level) ;
+//	}
+//	printf("max nodes = %llu \n",max_nodes);
 
 	unsigned *child_nodes = new unsigned[max_nodes]; //nodes[i] stores the number of children of node i
-
-	unsigned children = randint(outdegree_min,outdegree_max);
+       
+	if (child_nodes==NULL) {printf("Memory allcoate failed"); exit(0);}
+	
+	printf("child nodes array allocate sucessful.\n");
+	
+	unsigned children = randint(outdegree_min, outdegree_max);
 	node_t nodes_at_level = (node_t) children;
 	node_t nodes_at_next_level;
 	node_t total_nodes = 1;
 	child_nodes[0]=children;
 
-	for (unsigned level = 1; level < num_levels; level++){
+	for (unsigned level = 1; level < height_max; level++){
 		nodes_at_next_level=0;
-		for (node_t n=0; n<nodes_at_level;n++){	
-			children = (level==num_levels-1) ? 0 : randint(outdegree_min, outdegree_max);
+		int must_have_child=randint(0,nodes_at_level-1);
+		for (node_t n=0; n<nodes_at_level;n++){
+		     if(level < height_min){
+			children = (level==height_max-1) ? 0 : randint(outdegree_min, outdegree_max);
 			child_nodes[total_nodes++]=children;
+
+			if (total_nodes==max_nodes) {printf("Memory allcoate failed at level: %d, node : %d",level, n); exit(0);}
+
+
 			nodes_at_next_level+=(node_t)children;
+		     } else if(n==must_have_child){
+			children = (level==height_max-1) ? 0 : randint(outdegree_min, outdegree_max);
+			child_nodes[total_nodes++]=children;
+
+			if (total_nodes==max_nodes) {printf("Memory allcoate failed at level: %d, node : %d",level, n); exit(0);}
+
+
+
+			nodes_at_next_level+=(node_t)children;
+		     } else {
+			unsigned if_has_child_node=1;
+			unsigned iters=0;
+			while( iters++<possibility)
+				if_has_child_node*=randint(0,1);
+			if (if_has_child_node) {
+				children = (level==height_max-1) ? 0 : randint(outdegree_min, outdegree_max); 
+				child_nodes[total_nodes++]=children;
+
+				if (total_nodes==max_nodes) {printf("Memory allcoate failed at level: %d, node : %d",level, n); exit(0);}
+
+
+				nodes_at_next_level+=(node_t)children;
+			}else{
+				child_nodes[total_nodes++]=0;
+
+				if (total_nodes==max_nodes) {printf("Memory allcoate failed at level: %d, node : %d",level, n); exit(0);}
+
+
+			}
+
+		     }		     
 		}
 		nodes_at_level = nodes_at_next_level;
 	}
 
-	tree->num_levels = num_levels;
+	printf("Total nodes: %u\n",total_nodes);
+
+	tree->num_levels = height_max;
 	tree->num_nodes = total_nodes;
 	
 	tree->vertexArray = new node_t[tree->num_nodes+1];
@@ -90,6 +133,7 @@ void gen_random_tree(tree_t *tree, unsigned num_levels, unsigned outdegree_min, 
 	tree->descendantArray_gpu_np_hier = new node_t [tree->num_nodes];
 	tree->edgeArray = new node_t [tree->num_nodes];
 	
+
 	node_t last_created=0;
 	node_t edge_pointer=0;
 	tree->parentArray[0]=(node_t)-1;
@@ -102,16 +146,18 @@ void gen_random_tree(tree_t *tree, unsigned num_levels, unsigned outdegree_min, 
 		tree->descendantArray_gpu_np[node]=1;
 		tree->descendantArray_gpu_np_hier[node]=1;
 		//create the children
-		for (int i=0;i<child_nodes[node];i++){
+		for (int i=0;i< child_nodes[node];i++){
 			tree->edgeArray[edge_pointer++]=++last_created;
 			tree->parentArray[last_created]=node;	
 			tree->levelArray[last_created]=tree->levelArray[node]+1;
 		}
+				
 	}
 	tree->vertexArray[tree->num_nodes]=edge_pointer;
-
 	delete [] child_nodes;
 } 
+
+
 
 void tree_to_dot(tree_t tree, FILE *file){
 	if (tree.num_nodes==0){
