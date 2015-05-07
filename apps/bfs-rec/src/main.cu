@@ -99,8 +99,9 @@ int parse_arguments(int argc, char** argv) {
 void validateArrays(node_t n, unsigned int *array1, unsigned int *array2, const char *message){
 	for (node_t node=0; node<n;node++){
 		if (array1[node]!=array2[node]){
-			printf("ERROR: validation error at %llu: %s !\n", node, message);
-			break;
+			printf("Node %d : %d v.s. %d\n", node, array1[node], array2[node]);
+			//printf("ERROR: validation error at %llu: %s !\n", node, message);
+			//break;
 		}
 	}
 }
@@ -168,8 +169,8 @@ int main(int argc, char *argv[])
 	//compute bfs on GPU 
 	if (graph.num_nodes!=0) bfs_gpu(&graph, &stats);
 
-	validateArrays(graph.num_nodes, graph.levelArray, graph.levelArray_gpu, "GPU #1 bfs");
-	validateArrays(graph.num_nodes, graph.levelArray, graph.levelArray_gpu_np, "GPU #2 bfs np");
+	//validateArrays(graph.num_nodes, graph.levelArray, graph.levelArray_gpu, "GPU #1 bfs");
+	//validateArrays(graph.num_nodes, graph.levelArray, graph.levelArray_gpu_np, "GPU #2 bfs np");
 	validateArrays(graph.num_nodes, graph.levelArray, graph.levelArray_gpu_np_hier, "GPU #3 bfs np hier");
 
 	//write stats file

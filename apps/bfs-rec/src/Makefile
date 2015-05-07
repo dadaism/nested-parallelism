@@ -2,7 +2,7 @@ CC = /usr/bin/g++
 NVCC = /usr/local/cuda/bin/nvcc
 #CFLAGS = -g -pg -w -O4 -I..
 CFLAGS = -O2 -I..
-NVCCFLAGS = -Xcompiler -fopenmp -rdc=true -arch sm_35 -w -O2 -I.. 
+NVCCFLAGS = -Xcompiler -fopenmp -rdc=true -arch sm_35 -w -G -g -O2 -I.. 
 LINK_OPT = -L/usr/local/cuda/lib64 -lcuda -lcudart
 
 all:	main_0streams #main_1streams main_2streams main_4streams main_8streams  
