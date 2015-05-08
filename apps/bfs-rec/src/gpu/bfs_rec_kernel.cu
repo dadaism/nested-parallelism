@@ -9,6 +9,9 @@
 #define SHM_BUFF_SIZE 256
 #define NESTED_BLOCK_SIZE 128
 
+#ifndef THREADS_PER_BLOCK // nested kernel block size
+#define THREADS_PER_BLOCK 32
+#endif
 
 #if (PROFILE_GPU!=0)
 // records the number of kerbel calls performed
@@ -32,7 +35,7 @@ __global__ void gpu_print(unsigned int *idx)
 __device__ unsigned int gm_idx_pool[2000][1];
 
 // iterative, flat BFS traversal (note: synchronization-free implementation)
-__global__ void bfs_kernel_flat(unsigned level, int num_nodes, int *vertexArray, int *edgeArray, int *levelArray, bool *queue_empty){
+__global__ void bfs_kernel_flat(int level, int num_nodes, int *vertexArray, int *edgeArray, int *levelArray, bool *queue_empty){
 #if (PROFILE_GPU!=0)
 	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
 #endif
@@ -51,7 +54,7 @@ __global__ void bfs_kernel_flat(unsigned level, int num_nodes, int *vertexArray,
 }
 
 // recursive naive NFS traversal
-__global__ void bfs_kernel_dp(int node, int *vertexArray, int *edgeArray, unsigned *levelArray){
+__global__ void bfs_kernel_dp(int node, int *vertexArray, int *edgeArray, int *levelArray){
 #if (PROFILE_GPU!=0)
 	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
 #endif
@@ -61,11 +64,11 @@ __global__ void bfs_kernel_dp(int node, int *vertexArray, int *edgeArray, unsign
 	for (int i=0; i<STREAMS; ++i)  cudaStreamCreateWithFlags(&s[i], cudaStreamNonBlocking);	
 #endif
 
-	unsigned num_children = vertexArray[node+1]-vertexArray[node];
+	int num_children = vertexArray[node+1]-vertexArray[node];
 	for (unsigned childp = threadIdx.x; childp < num_children; childp+=blockDim.x){ // may change this to use multiple blocks
 		int child = edgeArray[vertexArray[node]+childp];
-		unsigned node_level = levelArray[node];
-		unsigned child_level = levelArray[child];
+		int node_level = levelArray[node];
+		int child_level = levelArray[child];
 		if (child_level==UNDEFINED || child_level>(node_level+1)){
 			unsigned old_level = atomicMin(&levelArray[child],node_level+1);
 			if (old_level == child_level){
@@ -82,7 +85,7 @@ __global__ void bfs_kernel_dp(int node, int *vertexArray, int *edgeArray, unsign
 }
 
 // recursive hierarchical BFS traversal
-__global__ void bfs_kernel_dp_hier(int node, int *vertexArray, int *edgeArray, unsigned *levelArray){
+__global__ void bfs_kernel_dp_hier(int node, int *vertexArray, int *edgeArray, int *levelArray){
 #if (PROFILE_GPU!=0)
 	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
 #endif
@@ -92,10 +95,10 @@ __global__ void bfs_kernel_dp_hier(int node, int *vertexArray, int *edgeArray, u
 	for (int i=0; i<STREAMS; ++i)  cudaStreamCreateWithFlags(&s[i], cudaStreamNonBlocking);	
 #endif
 	__shared__ int child;
-	__shared__ unsigned child_level;
+	__shared__ int child_level;
 	__shared__ unsigned num_grandchildren;
 	
-	unsigned node_level = levelArray[node];
+	int node_level = levelArray[node];
 	unsigned num_children = vertexArray[node+1]-vertexArray[node];
 	
 	for (unsigned childp = blockIdx.x; childp < num_children; childp+=gridDim.x){
@@ -134,7 +137,7 @@ __global__ void bfs_kernel_dp_hier(int node, int *vertexArray, int *edgeArray, u
 }
 
 // prepare bfs_kernel_dp_cons
-__global__ void  bfs_kernel_dp_cons_prepare(unsigned *levelArray, unsigned int *buffer, 
+__global__ void  bfs_kernel_dp_cons_prepare(int *levelArray, unsigned int *buffer, 
 													unsigned *idx, int source)
 {
 	levelArray[source] = 0;		// redundant
@@ -148,7 +151,7 @@ __global__ void  bfs_kernel_dp_cons_prepare(unsigned *levelArray, unsigned int *
 }
 
 // recursive BFS traversal with block-level consolidation
-__global__ void bfs_kernel_dp_cons(int *vertexArray, int *edgeArray, unsigned *levelArray, 
+__global__ void bfs_kernel_dp_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *buffer, unsigned int *idx) {
 #if (PROFILE_GPU!=0)
 	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;

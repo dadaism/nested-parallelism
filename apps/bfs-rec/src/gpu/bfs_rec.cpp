@@ -89,12 +89,12 @@ int parse_arguments(int argc, char** argv) {
 	return 1;
 }
 
-void validateArrays(node_t n, unsigned int *array1, unsigned int *array2, const char *message)
+void validateArrays(int n, int *array1, int *array2, const char *message)
 {
-	for (node_t node=0; node<n;node++){
+	for (int node=0; node<n;node++){
 		if (array1[node]!=array2[node]){
 			//printf("Node %d : %d v.s. %d\n", node, array1[node], array2[node]);
-			printf("ERROR: validation error at %llu: %s !\n", node, message);
+			printf("ERROR: validation error at %ll: %s !\n", node, message);
 			break;
 		}
 	}

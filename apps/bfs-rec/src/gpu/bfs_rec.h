@@ -10,6 +10,8 @@
 
 #include "global.h"
 
+#define UNDEFINED 0x7FFFFFFF
+
 typedef struct conf {
 	bool verbose;
 	bool debug;
