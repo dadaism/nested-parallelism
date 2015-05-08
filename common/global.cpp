@@ -20,6 +20,12 @@ double gettime() {
 	return t.tv_sec+t.tv_usec*1e-6;
 }
 
+double gettime_ms() {
+	struct timeval t;
+	gettimeofday(&t, NULL);
+	return t.tv_sec*1e+3+t.tv_usec*1e-3;
+}
+
 int readInputDIMACS9()
 {
     char *p;

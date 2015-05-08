@@ -13,18 +13,15 @@ void usage() {
 	fprintf(stderr, "    --debug,-d     enhanced verbosity level\n");
 	fprintf(stderr, "\nOther:\n");
 	fprintf(stderr, "    --import,-i <graph_file>           import graph file\n");
-	fprintf(stderr, "    --thread,-t <number of threads>    specify number of threads\n");
 	fprintf(stderr, "    --format,-f <number>               specify the input format\n");
  	fprintf(stderr, "                 0 - DIMACS9\n");
 	fprintf(stderr, "                 1 - DIMACS10\n");
 	fprintf(stderr, "                 2 - SLNDC\n");
 	fprintf(stderr, "    --solution,-s <number>             specify the solution\n");
-	fprintf(stderr, "                 0 - unordered + thread queue\n");
-	fprintf(stderr, "                 1 - dual queue\n");
-	fprintf(stderr, "                 2 - shared delayed buffer\n");
-	fprintf(stderr, "                 3 - global delayed buffer\n");
-	fprintf(stderr, "                 4 - multiple dynamic parallelism per block\n");
-	fprintf(stderr, "                 5 - single dynamic parallelism per block\n");
+	fprintf(stderr, "                 0 - GPU flat\n");
+	fprintf(stderr, "                 1 - GPU naive dynamic parallelism\n");
+	fprintf(stderr, "                 2 - GPU hierachical dynamic parallelism\n");
+	fprintf(stderr, "                 3 - GPU consolidated dynamic parallelism\n");
 	fprintf(stderr, "    --device,-e <number>               select the device\n");
 }
 
@@ -89,12 +86,40 @@ int parse_arguments(int argc, char** argv) {
 	return 1;
 }
 
+void bfs_cpu(int *levelArray){
+	levelArray[source]=0;
+	queue<int> workingSet;
+	workingSet.push(source);
+	
+	while(!workingSet.empty()){
+		int node = workingSet.front();
+		workingSet.pop();
+		unsigned next_level = levelArray[node]+1;
+		
+		for(int edge=graph.vertexArray[node]; edge<graph.vertexArray[node+1];edge++){
+			int neighbor=graph.edgeArray[edge];
+			if (levelArray[neighbor]==UNDEFINED || levelArray[neighbor]>next_level){
+				levelArray[neighbor]=next_level;
+				workingSet.push(neighbor);
+			}
+		
+		}
+	}
+}
+
+void setArrays(int size, int *arrays, int value)
+{
+	for (int i=0; i<size; ++i) {
+		arrays[i] = value;
+	}
+}
+
 void validateArrays(int n, int *array1, int *array2, const char *message)
 {
 	for (int node=0; node<n;node++){
 		if (array1[node]!=array2[node]){
 			//printf("Node %d : %d v.s. %d\n", node, array1[node], array2[node]);
-			printf("ERROR: validation error at %ll: %s !\n", node, message);
+			printf("ERROR: validation error at %lld: %s !\n", node, message);
 			break;
 		}
 	}
@@ -136,19 +161,32 @@ int main(int argc, char* argv[])
 	if (VERBOSE)
 		fprintf(stderr, "AdjList to CSR:\t\t%lf\n",end_time-time);
 
-	printf("%d\n", noNodeTotal);
+/*	printf("%d\n", noNodeTotal);
 	for (int i=0; i<noNodeTotal; ++i) {
 		int num_edge = graph.vertexArray[i+1] - graph.vertexArray[i];
 		printf("%d ", num_edge);
 	}
 	printf("\n");
-	
+*/	
 	//starts execution
 	printf("\n===MAIN=== :: [num_nodes,num_edges] = %u, %u\n", noNodeTotal, noEdgeTotal);
 
+	setArrays(noNodeTotal, graph.levelArray, UNDEFINED);
+	graph.levelArray[source] = 0;
 	/* Recursive BFS on GPU */
 	BFS_REC_GPU();
 	
+	int *levelArray_cpu = new int[noNodeTotal];
+	setArrays(noNodeTotal, levelArray_cpu, UNDEFINED);
+	levelArray_cpu[source] = 0;
+	bfs_cpu(levelArray_cpu);
+	
+	/*for (int i=0; i<noNodeTotal; ++i) {
+		printf("%d ", levelArray_cpu[i]);
+		//printf("%d ", graph.levelArray[i]);
+	} printf("\n");*/
+	validateArrays(noNodeTotal, graph.levelArray, levelArray_cpu, "GPU bfs rec");
+
 	clear();
 	return 0;
 }

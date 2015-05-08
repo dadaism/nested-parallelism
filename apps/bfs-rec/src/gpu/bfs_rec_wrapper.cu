@@ -115,7 +115,7 @@ void bfs_flat_gpu()
 
 	unsigned level = 0;	
 
-	start_time = gettime();
+	start_time = gettime_ms();
 	//level-based traversal
 	while (!queue_empty){
 		cudaCheckError(  __FILE__, __LINE__, cudaMemset( d_queue_empty, true, sizeof(bool)) );
@@ -125,13 +125,13 @@ void bfs_flat_gpu()
 		level++;
 	}
 
-	end_time=gettime(); // end timing execution
+	end_time=gettime_ms(); // end timing execution
 	printf("===> GPU #1 - flat parallelism: computation time = %.2f ms.\n", end_time-start_time);
 	
 	//copy the level array from GPU to CPU;
-	start_time = gettime();
+	start_time = gettime_ms();
 	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( graph.levelArray, d_levelArray, sizeof(unsigned)*noNodeTotal, cudaMemcpyDeviceToHost) );
-	end_time = gettime();
+	end_time = gettime_ms();
 	printf("mem copy to CPU time = %.2f ms.\n", end_time-start_time);
 }
 
@@ -143,21 +143,21 @@ void bfs_rec_dp_naive_gpu()
 	/* prepare GPU */
 	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( d_levelArray, graph.levelArray, sizeof(unsigned)*noNodeTotal, cudaMemcpyHostToDevice) );
 
-	start_time = gettime();
+	start_time = gettime_ms();
 	int children = graph.vertexArray[source+1]-graph.vertexArray[source];
 	unsigned block_size = min (children, THREADS_PER_BLOCK);
 	bfs_kernel_dp<<<1,block_size>>>(source, d_vertexArray, d_edgeArray, d_levelArray);
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
 	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
 	
-	end_time = gettime(); //end timing execution
+	end_time = gettime_ms(); //end timing execution
 	printf("===> GPU #2 - nested parallelism naive: computation time = %.2f s.\n", end_time-start_time);
 
 	
 	//copy the level array from GPU to CPU;
-	start_time = gettime();
+	start_time = gettime_ms();
 	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( graph.levelArray, d_levelArray, sizeof(unsigned)*noNodeTotal, cudaMemcpyDeviceToHost) );
-	end_time = gettime();
+	end_time = gettime_ms();
 	printf("mem copy to CPU time = %.2f ms.\n", end_time-start_time);
 }
 
@@ -166,7 +166,7 @@ void bfs_rec_dp_naive_gpu()
 // ----------------------------------------------------------
 void bfs_rec_dp_hier_gpu()
 {
-	start_time = gettime(); // start timing execution
+	start_time = gettime_ms(); // start timing execution
 	
 	//copy the level array from CPU to GPU	
 	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( d_levelArray, graph.levelArray, sizeof(unsigned)*noNodeTotal, cudaMemcpyHostToDevice) );
@@ -176,12 +176,12 @@ void bfs_rec_dp_hier_gpu()
 	bfs_kernel_dp_hier<<<children, THREADS_PER_BLOCK>>>(source, d_vertexArray, d_edgeArray, d_levelArray);
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
 	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
-	printf("===> GPU #3 - nested parallelism hierarchical: computation time = %.2f ms.\n", gettime()-start_time);
+	printf("===> GPU #3 - nested parallelism hierarchical: computation time = %.2f ms.\n", gettime_ms()-start_time);
 
 	//copy the level array from GPU to CPU;
-	start_time = gettime();
+	start_time = gettime_ms();
 	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( graph.levelArray, d_levelArray, sizeof(unsigned)*noNodeTotal, cudaMemcpyDeviceToHost) );
-	printf("mem copy to CPU time = %.2f ms.\n", gettime()-start_time);
+	printf("mem copy to CPU time = %.2f ms.\n", gettime_ms()-start_time);
 }
 
 // ----------------------------------------------------------
@@ -189,7 +189,7 @@ void bfs_rec_dp_hier_gpu()
 // ----------------------------------------------------------
 void bfs_rec_dp_cons_gpu()
 {
-	start_time = gettime(); // start timing execution
+	start_time = gettime_ms(); // start timing execution
 	
 	//copy the level array from CPU to GPU	
 	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( d_levelArray, graph.levelArray, sizeof(unsigned)*noNodeTotal, cudaMemcpyHostToDevice) );
@@ -207,14 +207,14 @@ void bfs_rec_dp_cons_gpu()
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
 	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
 	
-	end_time=gettime(); //end timing execution
+	end_time=gettime_ms(); //end timing execution
 	printf("===> GPU #4 - nested parallelism consolidation: computation time = %.2f ms.\n", end_time-start_time);
 	//gpu_print<<<1,1>>>(d_idx);
 	
 	//copy the level array from GPU to CPU;
-	start_time = gettime();
+	start_time = gettime_ms();
 	cudaCheckError(  __FILE__, __LINE__, cudaMemcpy( graph.levelArray, d_levelArray, sizeof(unsigned)*noNodeTotal, cudaMemcpyDeviceToHost) );
-	end_time = gettime();
+	end_time = gettime_ms();
 	printf("mem copy to CPU time = %.2f ms.\n", end_time-start_time);
 }
 
@@ -227,7 +227,7 @@ void BFS_REC_GPU()
 	cudaDeviceSynchronize();
 #endif
 
-	start_time = gettime();
+	double time = gettime_ms();
 	switch (config.solution) {
 		case 0:  bfs_flat_gpu();	// 
 			break;
@@ -240,8 +240,7 @@ void BFS_REC_GPU()
 		default:
 			break;
 	}
-	end_time = gettime();
-	fprintf(stderr, "Execution time:\t\t%lf\n", end_time-start_time);
+	fprintf(stderr, "Total execution time = %.2f ms.\n", gettime_ms()-time);
 
 #if (PROFILE_GPU!=0)
 	gpu_statistics<<<1,1>>>(1);

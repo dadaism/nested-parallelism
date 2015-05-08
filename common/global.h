@@ -42,6 +42,7 @@ struct _GRAPH_{
 };
 
 double gettime();
+double gettime_ms();
 
 
 extern list<int> *adjacencyNodeList;
