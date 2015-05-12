@@ -8,10 +8,14 @@
 #ifndef THREADS_PER_BLOCK_FLAT	//block size for flat parallelism
 #define THREADS_PER_BLOCK_FLAT 256
 #endif
+
 #ifndef NUM_BLOCKS_FLAT
 #define NUM_BLOCKS_FLAT 256
 #endif
 
+#ifndef CONSOLIDATE_LEVEL
+#define CONSOLIDATE_LEVEL 1
+#endif
 
 #include "bfs_rec_kernel.cu"
 
@@ -202,8 +206,17 @@ void bfs_rec_dp_cons_gpu()
     bfs_kernel_dp_cons_prepare<<<1,1>>>(d_levelArray, d_buffer, d_idx, source);
 	
 	int children = 1;
-	bfs_kernel_dp_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
+#if (CONSOLIDATE_LEVEL==0)
+	bfs_kernel_dp_warp_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_buffer, d_idx);
+#elif (CONSOLIDATE_LEVEL==1)
+	bfs_kernel_dp_block_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
+												d_buffer, d_buffer, d_idx);
+#elif (CONSOLIDATE_LEVEL==2)
+	bfs_kernel_dp_grid_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
+												d_buffer, d_buffer, d_idx);
+#endif
+
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
 	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
 	
