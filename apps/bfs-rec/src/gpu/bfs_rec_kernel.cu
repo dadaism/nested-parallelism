@@ -266,6 +266,11 @@ __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *l
 	}
 	__syncthreads();
 	// reorganize consolidation buffer for load balance ()
+	if (threadIdx.x==0) {
+		offset = atocmiAdd(idx, *block_index);
+	}
+	__syncthresds();
+
 	if (threadIdx.x==0 && sh_idx>ori_idx) {
 	//	printf("Launch kernel with %d - %d = %d blocks\n", sh_idx, ori_idx, sh_idx-ori_idx);
 		bfs_kernel_dp_grid_cons<<<sh_idx-ori_idx, THREADS_PER_BLOCK>>>(vertexArray, 
