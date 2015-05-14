@@ -1,6 +1,6 @@
 # ignored directories
-bin/
-log/
+#bin/
+#log/
 
 # ignored data/results
 *.rst
