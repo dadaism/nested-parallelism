@@ -5,6 +5,7 @@
 #define MAXDIMGRID 65535
 #define MAX_THREAD_PER_BLOCK 1024
 
+#define WARP_SIZE 32
 #define THREASHOLD 150
 #define SHM_BUFF_SIZE 256
 #define NESTED_BLOCK_SIZE 128
@@ -158,16 +159,20 @@ __global__ void bfs_kernel_dp_warp_cons(int *vertexArray, int *edgeArray, int *l
 #endif
 	unsigned int bid = blockIdx.x; // 1-Dimensional grid configuration
 	unsigned int t_idx;
-	__shared__ unsigned int sh_idx;
-	__shared__ unsigned int ori_idx;
+	__shared__ unsigned int sh_idx[THREADS_PER_BLOCK/WARP_SIZE+1];
+	__shared__ unsigned int ori_idx[THREADS_PER_BLOCK/WARP_SIZE+1];
+
+	int warp_id = threadIdx.x / WARP_SIZE;
+//	int warp_dim = blockDim.x / WARP_SIZE;
+//	int total_warp_num = gridDim.x * warp_dim;	
+
 	int node = queue[bid];
 
 	unsigned int num_children = vertexArray[node+1]-vertexArray[node];
-	if (threadIdx.x==0) {
-		ori_idx = atomicAdd(idx, num_children);
-		sh_idx = ori_idx;
+	if (threadIdx.x%WARP_SIZE==0) {
+		ori_idx[warp_id] = atomicAdd(idx, num_children);
+		sh_idx[warp_id] = ori_idx[warp_id];
 	}
-	__syncthreads();
 
 	for (unsigned childp = threadIdx.x; childp < num_children; childp+=blockDim.x) {
 		int child = edgeArray[vertexArray[node]+childp];
@@ -175,15 +180,15 @@ __global__ void bfs_kernel_dp_warp_cons(int *vertexArray, int *edgeArray, int *l
 		unsigned child_level = levelArray[child];
 		if (child_level==UNDEFINED || child_level>(node_level+1)){
 			unsigned old_level = atomicMin(&levelArray[child], node_level+1);
-			t_idx = atomicInc(&sh_idx, BUFF_SIZE);
+			t_idx = atomicInc(&sh_idx[warp_id], BUFF_SIZE);
 			buffer[t_idx] = child;
 		}
 	}
-	__syncthreads();
-	if (threadIdx.x==0 && sh_idx>ori_idx) {
+
+	if (threadIdx.x%WARP_SIZE==0 && sh_idx[warp_id]>ori_idx[warp_id]) {
 	//	printf("Launch kernel with %d - %d = %d blocks\n", sh_idx, ori_idx, sh_idx-ori_idx);
-		bfs_kernel_dp_warp_cons<<<sh_idx-ori_idx, THREADS_PER_BLOCK>>>(vertexArray, 
-									 	edgeArray, levelArray, buffer+ori_idx, 
+		bfs_kernel_dp_warp_cons<<<sh_idx[warp_id]-ori_idx[warp_id], THREADS_PER_BLOCK>>>(vertexArray, 
+									 	edgeArray, levelArray, buffer+ori_idx[warp_id], 
 										buffer, idx);
 	}
 
@@ -260,6 +265,7 @@ __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *l
 		}
 	}
 	__syncthreads();
+	// reorganize consolidation buffer for load balance ()
 	if (threadIdx.x==0 && sh_idx>ori_idx) {
 	//	printf("Launch kernel with %d - %d = %d blocks\n", sh_idx, ori_idx, sh_idx-ori_idx);
 		bfs_kernel_dp_grid_cons<<<sh_idx-ori_idx, THREADS_PER_BLOCK>>>(vertexArray, 
@@ -269,10 +275,6 @@ __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *l
 
 	// no post work require
 }
-
-
-
-
 
 
 

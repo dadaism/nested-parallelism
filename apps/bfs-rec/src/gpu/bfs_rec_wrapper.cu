@@ -14,7 +14,7 @@
 #endif
 
 #ifndef CONSOLIDATE_LEVEL
-#define CONSOLIDATE_LEVEL 1
+#define CONSOLIDATE_LEVEL 2
 #endif
 
 #include "bfs_rec_kernel.cu"
@@ -207,12 +207,15 @@ void bfs_rec_dp_cons_gpu()
 	
 	int children = 1;
 #if (CONSOLIDATE_LEVEL==0)
+	fprintf(stdout, "warp level consolidation\n");
 	bfs_kernel_dp_warp_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_buffer, d_idx);
 #elif (CONSOLIDATE_LEVEL==1)
+	fprintf(stdout, "block level consolidation\n");
 	bfs_kernel_dp_block_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_buffer, d_idx);
 #elif (CONSOLIDATE_LEVEL==2)
+	fprintf(stdout, "grid level consolidation\n");
 	bfs_kernel_dp_grid_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_buffer, d_idx);
 #endif
