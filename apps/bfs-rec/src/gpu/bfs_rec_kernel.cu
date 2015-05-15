@@ -238,22 +238,26 @@ __global__ void bfs_kernel_dp_block_cons(int *vertexArray, int *edgeArray, int *
 // recursive BFS traversal with block-level consolidation
 __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *qidx, 
-								unsigned int *buffer, unsigned int *idx) {
+								unsigned int *buffer, unsigned int *idx,
+								unsigned int *count) 
+{
 #if (PROFILE_GPU!=0)
-	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) nestd_calls++;
 #endif
 	unsigned int bid = blockIdx.x; // 1-Dimensional grid configuration
 	unsigned int t_idx;
 	__shared__ int *sh_buffer;
 	__shared__ unsigned int sh_idx;
 	__shared__ unsigned int ori_idx;
-
+	__shared__ unsigned int offset;
 	int node = queue[bid];
 
 	unsigned int num_children = vertexArray[node+1]-vertexArray[node];
 	if (threadIdx.x==0) {
-		ori_idx = atomicAdd(idx, num_children);
-		sh_idx = ori_idx;
+		sh_buffer = (int*)malloc(sizeof(int)*num_children);
+		sh_idx = 0;
+		//ori_idx = atomicAdd(idx, num_children);
+		//sh_idx = ori_idx;
 	}
 	__syncthreads();
 
@@ -264,45 +268,50 @@ __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *l
 		if (child_level==UNDEFINED || child_level>(node_level+1)){
 			unsigned old_level = atomicMin(&levelArray[child], node_level+1);
 			t_idx = atomicInc(&sh_idx, BUFF_SIZE);
-			buffer[t_idx] = child;
+			sh_buffer[t_idx] = child;
 		}
 	}
 	__syncthreads();
 	// reorganize consolidation buffer for load balance ()
 	if (threadIdx.x==0) {
-		offset = atocmiAdd(qidx, sh_idx-ori_idx);
+		//offset = atomicAdd(qidx, sh_idx-ori_idx);
+		offset = atomicAdd(idx, sh_idx);
 	}
-	__syncthresds();
+	__syncthreads();
 	// dump block_level buffer to grids
-	for (unsigned tid = threadIdx.x; tid<(sh_idx-ori_idx); tid+=blockDim.x) {
+	for (unsigned tid = threadIdx.x; tid<sh_idx; tid+=blockDim.x) {
 		int gm_idx = tid + offset;
-		queue[gm_idx] = buffer[tid];
+		buffer[gm_idx] = sh_buffer[tid];
 	}
 	__syncthreads();
 
 	// 2nd phase, grid level kernel launch
 	if (threadIdx.x==0) {
+		free(sh_buffer);	// free allocated block buffer
 		// count up
-		if (atomicInc(count, MAXDIMGRID) >= (gridDim.x*gridDim.y-1)) {
+		if (atomicInc(count, MAXDIMGRID) >= (gridDim.x-1)) {
 #ifdef GPU_PROFILE
 			nested_calls++;
 #endif
+			//printf("Buffer size %d\n", *idx);
+			*count = 0;	// reset counter
+			*qidx = 0;	// reset next buffer index
 			dim3 dimGrid(1,1,1);
-			if (*qidx<=MAXDIMGRID) {
-				dimGrid.x = *qidx;
+			if (*idx<=MAXDIMGRID) {
+				dimGrid.x = *idx;
 			}
-			else if (*qidx<=MAXDIMGRID*THREADS_PER_BLOCK) {
+		/*	else if (*idx<=MAXDIMGRID*THREADS_PER_BLOCK) {
 				dimGrid.x = MAXDIMGRID;
-				dimGrid.y = *qidx/MAXDIMGRID+1;
-			}
+				dimGrid.y = *idx/MAXDIMGRID+1;
+			}*/
 			else {
 				printf("Too many elements in queue\n");
 			}
 
 			bfs_kernel_dp_grid_cons<<<dimGrid, THREADS_PER_BLOCK>>>(vertexArray, edgeArray,
-								levelArray, queue, qidx, buffer, idx);
+								levelArray, buffer, idx, queue, qidx, count);
+		}
 	}
-
 
 //	if (threadIdx.x==0 && sh_idx>ori_idx) {
 	//	printf("Launch kernel with %d - %d = %d blocks\n", sh_idx, ori_idx, sh_idx-ori_idx);

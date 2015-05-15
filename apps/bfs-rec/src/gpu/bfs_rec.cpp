@@ -180,11 +180,12 @@ int main(int argc, char* argv[])
 	setArrays(noNodeTotal, levelArray_cpu, UNDEFINED);
 	levelArray_cpu[source] = 0;
 	bfs_cpu(levelArray_cpu);
-	
-	/*for (int i=0; i<noNodeTotal; ++i) {
-		printf("%d ", levelArray_cpu[i]);
-		//printf("%d ", graph.levelArray[i]);
-	} printf("\n");*/
+	/*
+	for (int i=0; i<noNodeTotal; ++i) {
+		//printf("%d ", levelArray_cpu[i]);
+		printf("%d ", graph.levelArray[i]);
+	} printf("\n");
+	*/
 	validateArrays(noNodeTotal, graph.levelArray, levelArray_cpu, "GPU bfs rec");
 
 	clear();

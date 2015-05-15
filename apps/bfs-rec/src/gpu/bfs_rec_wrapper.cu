@@ -215,9 +215,17 @@ void bfs_rec_dp_cons_gpu()
 	bfs_kernel_dp_block_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_buffer, d_idx);
 #elif (CONSOLIDATE_LEVEL==2)
-	fprintf(stdout, "grid level consolidation\n");
+	unsigned int *d_queue;
+	unsigned int *d_qidx;
+	unsigned int *d_count;
+	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_queue, sizeof(unsigned int)*BUFF_SIZE) );
+	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_qidx, sizeof(unsigned int)) );
+	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_count, sizeof(unsigned int)) );
+	cudaCheckError(  __FILE__, __LINE__, cudaMemset( d_qidx, 0, sizeof(unsigned int)) );
+	cudaCheckError(  __FILE__, __LINE__, cudaMemset( d_count, 0, sizeof(unsigned int)) );
+    fprintf(stdout, "grid level consolidation\n");
 	bfs_kernel_dp_grid_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
-												d_buffer, d_buffer, d_idx);
+												d_buffer, d_idx, d_queue, d_qidx, d_count);
 #endif
 
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
