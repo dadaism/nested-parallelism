@@ -116,10 +116,10 @@ void setArrays(int size, int *arrays, int value)
 
 void validateArrays(int n, int *array1, int *array2, const char *message)
 {
-	for (int node=0; node<n;node++){
+	for (int node=0; node<n; node++){
 		if (array1[node]!=array2[node]){
-			//printf("Node %d : %d v.s. %d\n", node, array1[node], array2[node]);
 			printf("ERROR: validation error at %lld: %s !\n", node, message);
+			//printf("Node %d : %d v.s. %d\n", node, array1[node], array2[node]);
 			break;
 		}
 	}
@@ -180,12 +180,12 @@ int main(int argc, char* argv[])
 	setArrays(noNodeTotal, levelArray_cpu, UNDEFINED);
 	levelArray_cpu[source] = 0;
 	bfs_cpu(levelArray_cpu);
-	/*
-	for (int i=0; i<noNodeTotal; ++i) {
+	
+	/*for (int i=0; i<noNodeTotal; ++i) {
 		//printf("%d ", levelArray_cpu[i]);
 		printf("%d ", graph.levelArray[i]);
-	} printf("\n");
-	*/
+	} printf("\n");*/
+	
 	validateArrays(noNodeTotal, graph.levelArray, levelArray_cpu, "GPU bfs rec");
 
 	clear();

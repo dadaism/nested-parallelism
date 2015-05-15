@@ -14,7 +14,7 @@
 #endif
 
 #ifndef CONSOLIDATE_LEVEL
-#define CONSOLIDATE_LEVEL 2
+#define CONSOLIDATE_LEVEL 1
 #endif
 
 #include "bfs_rec_kernel.cu"
@@ -201,7 +201,7 @@ void bfs_rec_dp_cons_gpu()
 	//recursive BFS traversal - dynamic parallelism consolidation
 	unsigned int *d_buffer;
 	unsigned int *d_idx;
-	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_buffer, sizeof(unsigned int)*BUFF_SIZE) );
+	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_buffer, sizeof(unsigned int)*GM_BUFF_SIZE) );
 	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_idx, sizeof(unsigned int)) );
     bfs_kernel_dp_cons_prepare<<<1,1>>>(d_levelArray, d_buffer, d_idx, source);
 	
@@ -218,7 +218,7 @@ void bfs_rec_dp_cons_gpu()
 	unsigned int *d_queue;
 	unsigned int *d_qidx;
 	unsigned int *d_count;
-	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_queue, sizeof(unsigned int)*BUFF_SIZE) );
+	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_queue, sizeof(unsigned int)*GM_BUFF_SIZE) );
 	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_qidx, sizeof(unsigned int)) );
 	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_count, sizeof(unsigned int)) );
 	cudaCheckError(  __FILE__, __LINE__, cudaMemset( d_qidx, 0, sizeof(unsigned int)) );
