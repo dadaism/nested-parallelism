@@ -1,4 +1,0 @@
-./script_bfs /share/IPDPS2015_datasets/graph-dataset4/graph_25000_1_8.gr log/graph-datasets4/graph_25000_1_8.log
-./script_bfs /share/IPDPS2015_datasets/graph-dataset4/graph_25000_8_8.gr log/graph-datasets4/graph_25000_8_8.log
-./script_bfs /share/IPDPS2015_datasets/graph-dataset3/graph_10000_1_8.gr log/graph-datasets3/graph_10000_1_8.log
-./script_bfs /share/IPDPS2015_datasets/graph-dataset3/graph_10000_8_8.gr log/graph-datasets3/graph_10000_8_8.log
