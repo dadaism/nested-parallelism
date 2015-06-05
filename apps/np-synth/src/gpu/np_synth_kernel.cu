@@ -47,6 +47,7 @@ __device__ double atomicAdd(double* address, double val)
     return __longlong_as_double(old); 
 }
 
+#if CUDA_VERSION <= 6000
 __device__ inline double __shfl_down (double var, unsigned int src_lane, int width=32)
 {
     int2 a = *reinterpret_cast<int2*>(&var);
@@ -54,6 +55,7 @@ __device__ inline double __shfl_down (double var, unsigned int src_lane, int wid
     a.y = __shfl_down(a.y, src_lane, width);
     return *reinterpret_cast<double*>(&a);
 }
+#endif
 
 __inline__ __device__ FLOAT_T warp_reduce_sum(FLOAT_T val) {
     for (int offset = WARP_SIZE/2; offset > 0; offset /= 2)
