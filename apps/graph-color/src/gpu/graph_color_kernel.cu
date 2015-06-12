@@ -92,6 +92,79 @@ __global__ void gclr_block_queue_kernel(int *vertexArray, int *edgeArray, int *c
    - in phase 1, the threads access the nodes in the queue with a thread-based mapping (one node per thread)
    - in phase 2, the blocks access the nodes in the delayed-buffer in a block-based mapping (one neighbor per thread)
 */
+__global__ void gclr_bitmap_shared_delayed_buffer_kernel(int *vertexArray, int *edgeArray, int *color,
+														unsigned int *nonstop, int color_type, int nodeNumber )
+{
+
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	
+	int t_idx = 0;	//	thread-based variable used to index inside the delayed buffer
+	__shared__ int buffer[SHM_BUFF_SIZE]; //delayed buffer
+	__shared__ unsigned int idx; //index within the delayed buffer
+
+	if (threadIdx.x==0) idx = 0;
+	__syncthreads();
+
+	if ( tid<nodeNumber && color[tid]==0 ) {
+		/* get neighbor range */
+		int start = vertexArray[tid];
+		int end = vertexArray[tid+1];
+		int edge_num = end - start;
+		if ( edge_num < THREASHOLD ) {
+			bool flag = true;
+			/* access neighbors */
+			for (int i=start; i<end; ++i) {
+				int nid = edgeArray[i];
+				if ( (color[nid]==0 || color[nid]==color_type) &&  nid<tid ) { // nid is not colored and have smaller id
+					flag = false;	break;
+				}
+			}
+			if (flag) {
+				color[tid] = color_type;
+				*nonstop = 1;
+			}
+		}
+		else {	//	insert into delayed buffer
+			t_idx = atomicInc(&idx, SHM_BUFF_SIZE);
+			buffer[t_idx] = tid;
+		}
+	}
+	__syncthreads();
+	// 2nd phase - each block processed all the elements in its shared memory buffer;
+	// each thread processes a different neighbor
+#ifdef GPU_PROFILE
+	if (tid==0 && idx!=0) {
+		printf("In Block %d # delayed nodes : %d\n", blockIdx.x, idx);
+	}
+#endif
+	__shared__ bool flag;
+	for (int i=0; i<idx; i++) { // no need to check color == 0, already checked in 1st phase
+		if (threadIdx.x==0) flag = true;
+		__syncthreads();
+		int curr = buffer[i]; //grab an element from the buffer
+		// get neighbour range    
+		int start = vertexArray[curr];
+		int end = vertexArray[curr+1];
+		// access neighbors - one thread per neigbor;
+		for (int eid=start+threadIdx.x; eid<end; eid+=blockDim.x){
+			int nid = edgeArray[eid]; // neighbour id
+    		if ( (color[nid]==0 || color[nid]==color_type) && nid<curr ) {
+				flag = false;
+				break;
+			}
+    	}
+		__syncthreads();
+		if (threadIdx.x==0 && flag) color[curr] = color_type;
+	}
+}
+
+
+/* LOAD BALANCING THROUGH DELAYED BUFFER */
+
+/* implements a delayed buffer in shared memory:
+   - in phase 1, the threads access the nodes in the queue with a thread-based mapping (one node per thread)
+   - in phase 2, the blocks access the nodes in the delayed-buffer in a block-based mapping (one neighbor per thread)
+*/
 __global__ void gclr_queue_shared_delayed_buffer_kernel(int *vertexArray, int *edgeArray, int *color,
 														int color_type, int *queue, unsigned int *queue_length,
 														int nodeNumber )
