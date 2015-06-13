@@ -4,7 +4,7 @@
 #define MAXDIMGRID 65535
 #define MAXDIMBLOCK 1024
 
-#define THREASHOLD 64
+#define THREASHOLD 512
 #define SHM_BUFF_SIZE 256
 #define NESTED_BLOCK_SIZE 32
 #define MAX_STREAM_NUM 8
@@ -154,7 +154,10 @@ __global__ void gclr_bitmap_shared_delayed_buffer_kernel(int *vertexArray, int *
 			}
     	}
 		__syncthreads();
-		if (threadIdx.x==0 && flag) color[curr] = color_type;
+		if (threadIdx.x==0 && flag) {
+			color[curr] = color_type;
+			*nonstop = 1;
+		}
 	}
 }
 

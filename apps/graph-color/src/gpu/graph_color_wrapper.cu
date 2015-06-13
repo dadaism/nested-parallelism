@@ -124,6 +124,9 @@ void gclr_nopruning_gpu()
 		color_type++;
 		cudaCheckError( __LINE__, cudaMemcpy( &nonstop, d_nonstop, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
 	}   
+
+	if (DEBUG)
+		fprintf(stderr, "Graph Coloring ends in %d iterations.\n", color_type-1);
 }
 
 void gclr_queue_gpu()
@@ -684,7 +687,8 @@ void gclr_queue_np_naive_gpu()
 		color_type++;
 		cudaCheckError( __LINE__, cudaMemcpy( &queue_length, d_queue_length, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
 
-		fprintf(stderr, "Iteration: %d  Queue length: %d\n", color_type-1, queue_length);
+		if (DEBUG)
+			fprintf(stderr, "Iteration: %d  Queue length: %d\n", color_type-1, queue_length);
 	}
 	if (DEBUG)
 		fprintf(stderr, "Graph Coloring ends in %d iterations.\n", color_type-1);
