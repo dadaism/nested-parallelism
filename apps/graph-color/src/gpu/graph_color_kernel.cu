@@ -4,7 +4,7 @@
 #define MAXDIMGRID 65535
 #define MAXDIMBLOCK 1024
 
-#define THREASHOLD 64
+#define THREASHOLD 512
 #define SHM_BUFF_SIZE 256
 #define NESTED_BLOCK_SIZE 32
 #define MAX_STREAM_NUM 8
@@ -314,6 +314,25 @@ __global__ void gclr_queue_global_delayed_buffer_kernel(int *vertexArray, int *e
 /* Child kernel invoked by the dynamic parallelism implementation with multiple kernel calls
    This kernel processes the neighbors of a certain node. The starting and ending point (start and end parameters) within the edge array are given as parameter
 */
+__global__ void bitmap_process_neighbors(int curr, int *edgeArray, int *color,
+								 		 int color_type, int start, int end,
+										 unsigned int *nonstop)
+{
+	__shared__ bool flag ;
+	if (threadIdx.x==0) flag = true;
+	__syncthreads();
+	for(int tid=threadIdx.x+start; tid<end; tid += blockDim.x){
+		int nid = edgeArray[tid];
+		if ( (color[nid]==0 || color[nid]==color_type) && nid<curr ) {
+			flag = false; break;
+		}
+	}
+	if (threadIdx.x==0 && flag) {
+		*nonstop = 1;
+		color[curr] = color_type;
+	}
+}
+
 __global__ void process_neighbors(int curr, int *edgeArray, int *color,
 								  int color_type, int start, int end)
 {
@@ -330,46 +349,41 @@ __global__ void process_neighbors(int curr, int *edgeArray, int *color,
 }
 
 __global__ void gclr_bitmap_multidp_kernel(int *vertexArray, int *edgeArray, int *color,
-										  int color_type, int nodeNumber, int *queue,
-										  unsigned int *qLength)
+											unsigned int *nonstop, int color_type, 
+											int nodeNumber)
 {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
  	
-	int t_idx = 0;  //  thread-based variable used to index inside the delayed buffer
-	__shared__ int buffer[SHM_BUFF_SIZE]; //delayed buffer
-	__shared__ unsigned int idx; //index within the delayed buffer
-
-    if (threadIdx.x==0) idx = 0;
-    __syncthreads();
-
 	cudaStream_t s[MAX_STREAM_NUM];
 	for (int i=0; i<MAX_STREAM_NUM; ++i) {
 		cudaStreamCreateWithFlags(&s[i], cudaStreamNonBlocking);
 		//cudaStreamCreateWithFlags(&s[i], cudaStreamDefault);
 	}
-	if ( tid<frontierNo ){
-		bool flag = true;
-		int curr = queue[tid];	//	grab a work from queue, tid is queue index
+	bool flag = true;
+	if ( tid<nodeNumber && color[tid]==0 ){
 		/* get neighbour range */
-		int start = vertexArray[curr];
-		int end = vertexArray[curr+1];
+		int start = vertexArray[tid];
+		int end = vertexArray[tid+1];
 		int edge_num = end - start;
 		if ( edge_num<THREASHOLD ) {		
 			/* access neighbours */
 			for (int i=start; i<end; ++i) {
 				int nid = edgeArray[i];
-				if ( (color[nid]==0 || color[nid]==color_type) && nid<curr ){	// neighbour's level can be reduced
+				if ( (color[nid]==0 || color[nid]==color_type) && nid<tid ){	// neighbour's level can be reduced
 					flag = false; break;
 				}
 			}
-			if (flag) color[curr] = color_type;
+			if (flag) {
+				color[tid] = color_type;
+				*nonstop = 1;
+			}
 		}
 		else {
 #ifdef GPU_PROFILE
 			nested_calls++;
 			//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
-     		process_neighbors<<<1, NESTED_BLOCK_SIZE,0, s[threadIdx.x%MAX_STREAM_NUM]>>>(curr, edgeArray, color, color_type, start, end);
+     		bitmap_process_neighbors<<<1, NESTED_BLOCK_SIZE,0, s[threadIdx.x%MAX_STREAM_NUM]>>>(tid, edgeArray, color, color_type, start, end, nonstop);
 		}
 	}
 }

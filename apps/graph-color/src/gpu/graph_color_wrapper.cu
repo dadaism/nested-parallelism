@@ -328,12 +328,12 @@ void gclr_np_naive_gpu()
 
 	while (nonstop) {
 		cudaCheckError( __LINE__, cudaMemset(d_nonstop, 0, sizeof(unsigned int)));
-		gclr_bitmap_multidp_kernel<<<dimGrid, dimBlock>>>(	d_vertexArray, d_edgeArray, d_colorArray, color_type,
-															noNodeTotal, d_work_queue, d_queue_length);
+		gclr_bitmap_multidp_kernel<<<dimGrid, dimBlock>>>(	d_vertexArray, d_edgeArray, d_colorArray, 
+															d_nonstop, color_type, noNodeTotal);
 		color_type++;
 		cudaCheckError( __LINE__, cudaMemcpy( &nonstop, d_nonstop, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
-
-		fprintf(stderr, "Iteration: %d  Queue length: %d\n", color_type-1, queue_length);
+		if ( (color_type-1)%100==0 )
+			fprintf(stderr, "Iteration: %d\n", color_type-1);
 	}
 	if (DEBUG)
 		fprintf(stderr, "Graph Coloring ends in %d iterations.\n", color_type-1);
