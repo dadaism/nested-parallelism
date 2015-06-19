@@ -373,17 +373,14 @@ __global__ void gclr_bitmap_multidp_kernel(int *vertexArray, int *edgeArray, int
 					flag = false; break;
 				}
 			}
-			if (flag) {
-				color[tid] = color_type;
-				*nonstop = 1;
-			}
+			if (flag) color[tid] = color_type;
 		}
 		else {
 #ifdef GPU_PROFILE
 			nested_calls++;
 			//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
-     		bitmap_process_neighbors<<<1, NESTED_BLOCK_SIZE,0, s[threadIdx.x%MAX_STREAM_NUM]>>>(tid, edgeArray, color, color_type, start, end, nonstop);
+     		process_neighbors<<<1, NESTED_BLOCK_SIZE,0, s[threadIdx.x%MAX_STREAM_NUM]>>>(tid, edgeArray, color, color_type, start, end);
 		}
 	}
 }
@@ -453,6 +450,54 @@ __global__ void process_buffer( int *vertexArray, int *edgeArray, int *color, in
 }
 
 /* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
+__global__ void gclr_bitmap_singledp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
+											int nodeNumber,	int *buffer)
+{
+	unsigned per_block_buffer = GM_BUFF_SIZE/gridDim.x;     // amount of the buffer available to each thread block
+    unsigned block_offset = blockIdx.x * per_block_buffer;  // block offset within the buffer
+    __shared__ unsigned int block_index;                            // index of each block within its sub-buffer
+    int t_idx = 0;                                          // used to access the buffer
+    if (threadIdx.x == 0) block_index = 0;
+    __syncthreads();
+
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	// 1st phase
+	if ( tid<nodeNumber && color[tid]==0 ){
+		bool flag = true;
+		/* get neighbor range */
+		int start = vertexArray[tid];
+		int end = vertexArray[tid+1];
+		int edge_num = end - start;
+		if ( edge_num<THREASHOLD ) {
+			/* access neighbors */
+			for (int i=start; i<end; ++i) {
+				int nid = edgeArray[i];
+				if ( (color[nid]==0 || color[nid]==color_type) && nid<tid ){	// neighbour's level can be reduced
+					flag = false; break;
+				}
+			}
+			if (flag) color[tid] = color_type;
+		}
+		else {
+			t_idx = atomicInc(&block_index, per_block_buffer);
+			buffer[t_idx+block_offset] = tid;
+		}
+	}
+	__syncthreads();
+	
+	//2nd phase - nested kernel call
+	if (threadIdx.x==0 && block_index!=0){
+#ifdef GPU_PROFILE
+		nested_calls++;
+#endif
+		process_buffer<<<block_index,NESTED_BLOCK_SIZE>>>( vertexArray, edgeArray, color, color_type,
+															nodeNumber, buffer+block_offset, block_index);
+	}
+}
+
+
+
+/* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
 __global__ void gclr_queue_singledp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
 											int nodeNumber,	int *queue, unsigned int *qLength, int *buffer)
 {
@@ -501,7 +546,191 @@ __global__ void gclr_queue_singledp_kernel(int *vertexArray, int *edgeArray, int
 }
 
 /* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
-__global__ void gclr_consolidate_warp_dp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
+__global__ void gclr_bitmap_cons_warp_dp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
+											int nodeNumber,	int *buffer)
+{
+	cudaStream_t s[MAX_STREAM_NUM];
+	for (int i=0; i<MAX_STREAM_NUM; ++i) {
+		cudaStreamCreateWithFlags(&s[i], cudaStreamNonBlocking);
+	}
+	int warpId = threadIdx.x / WARP_SIZE;
+	int warpDim = blockDim.x / WARP_SIZE;
+	int total_warp_num = gridDim.x * warpDim;
+	unsigned per_warp_buffer = GM_BUFF_SIZE/total_warp_num; 	// amount of the buffer available to each thread block
+	unsigned warp_offset = (blockIdx.x * warpDim + warpId) * per_warp_buffer;  // block offset within the buffer
+
+	unsigned int *warp_index = &gm_idx_pool[blockIdx.x * warpDim + warpId];				// index of each block within its sub-buffer
+	int t_idx = 0;						// used to access the buffer
+	*warp_index = 0;
+
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	// 1st phase
+	if ( tid<nodeNumber && color[tid]==0 ){
+		bool flag = true;
+		/* get neighbor range */
+		int start = vertexArray[tid];
+		int end = vertexArray[tid+1];
+		int edge_num = end - start;
+		if ( edge_num<THREASHOLD ) {
+			/* access neighbors */
+			for (int i=start; i<end; ++i) {
+				int nid = edgeArray[i];
+				if ( (color[nid]==0 || color[nid]==color_type) && nid<tid ){	// neighbour's level can be reduced
+					flag = false; break;
+				}
+			}
+			if (flag) color[tid] = color_type;
+		}
+		else {
+			t_idx = atomicInc(warp_index, per_warp_buffer);
+			buffer[t_idx+warp_offset] = tid;
+		}
+	}
+
+	//2nd phase - nested kernel call
+	if (threadIdx.x%WARP_SIZE==0 && *warp_index!=0){
+#ifdef GPU_PROFILE
+		nested_calls++;
+#endif
+		process_buffer<<<*warp_index,NESTED_BLOCK_SIZE,0, s[warpId%MAX_STREAM_NUM]>>>( vertexArray, edgeArray, color, color_type,
+															nodeNumber, buffer+warp_offset, *warp_index);
+	}
+}
+
+/* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
+__global__ void gclr_bitmap_cons_block_dp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
+											int nodeNumber,	int *buffer)
+{
+	cudaStream_t s;
+	cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
+	unsigned per_block_buffer = GM_BUFF_SIZE/gridDim.x;     // amount of the buffer available to each thread block
+    unsigned block_offset = blockIdx.x * per_block_buffer;  // block offset within the buffer
+    __shared__ int shm_buffer[MAXDIMBLOCK];
+    unsigned int *block_index = &gm_idx_pool[blockIdx.x];	// index of each block within its sub-buffer
+    int t_idx = 0;                                          // used to access the buffer
+    if (threadIdx.x == 0) *block_index = 0;
+    __syncthreads();
+
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	// 1st phase
+	if ( tid<nodeNumber && color[tid]==0 ){
+		bool flag = true;
+		/* get neighbor range */
+		int start = vertexArray[tid];
+		int end = vertexArray[tid+1];
+		int edge_num = end - start;
+		if ( edge_num<THREASHOLD ) {
+			/* access neighbors */
+			for (int i=start; i<end; ++i) {
+				int nid = edgeArray[i];
+				if ( (color[nid]==0 || color[nid]==color_type) && nid<tid ){	// neighbour's level can be reduced
+					flag = false; break;
+				}
+			}
+			if (flag) color[tid] = color_type;
+		}
+		else {
+			t_idx = atomicInc(block_index, per_block_buffer);
+			shm_buffer[t_idx] = tid;
+		}
+	}
+	__syncthreads();
+	// dump shm_buffer to global buffer
+	if (threadIdx.x<*block_index) {
+		int idx = threadIdx.x + block_offset;
+		buffer[idx] = shm_buffer[threadIdx.x];
+	}
+	__syncthreads();
+
+	//2nd phase - nested kernel call
+	if (threadIdx.x==0 && *block_index!=0){
+#ifdef GPU_PROFILE
+		nested_calls++;
+#endif
+		process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>( vertexArray, edgeArray, color, color_type,
+															nodeNumber, buffer+block_offset, *block_index);
+	}
+}
+
+/* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
+__global__ void gclr_bitmap_cons_grid_dp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
+												int nodeNumber, int *buffer, unsigned int *idx, unsigned int *count)
+{
+	cudaStream_t s;
+	cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
+	unsigned per_block_buffer = GM_BUFF_SIZE/gridDim.x;     // amount of the buffer available to each thread block
+    //unsigned block_offset = blockIdx.x * per_block_buffer;  // block offset within the buffer
+    __shared__ int shm_buffer[MAXDIMBLOCK];
+    unsigned int *block_index = &gm_idx_pool[blockIdx.x];	// index of each block within its sub-buffer
+    __shared__ int offset;
+    int t_idx = 0;                                          // used to access the buffer
+    if (threadIdx.x == 0) *block_index = 0;
+    __syncthreads();
+
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	// 1st phase
+	if ( tid<nodeNumber && color[tid]==0 ){
+		bool flag = true;
+		/* get neighbor range */
+		int start = vertexArray[tid];
+		int end = vertexArray[tid+1];
+		int edge_num = end - start;
+		if ( edge_num<THREASHOLD ) {
+			/* access neighbors */
+			for (int i=start; i<end; ++i) {
+				int nid = edgeArray[i];
+				if ( (color[nid]==0 || color[nid]==color_type) && nid<tid ){	// neighbour's level can be reduced
+					flag = false; break;
+				}
+			}
+			if (flag) color[tid] = color_type;
+		}
+		else {
+			t_idx = atomicInc(block_index, per_block_buffer);
+			shm_buffer[t_idx] = tid;
+		}
+	}
+	__syncthreads();
+	// reorganize consolidation buffer for load balance (get offset per block)
+	if (threadIdx.x==0) {
+		offset = atomicAdd(idx, *block_index);
+		//printf("blockIdx.x: %d block idx: %d idx: %d\n", blockIdx.x, block_index, offset);
+	}
+	__syncthreads();
+	// dump shm_buffer to global buffer
+	if (threadIdx.x<*block_index) {
+		int gm_idx = threadIdx.x + offset;
+		buffer[gm_idx] = shm_buffer[threadIdx.x];
+	}
+	__syncthreads();
+
+	// 2nd phase, grid level consolidation
+	if (threadIdx.x==0) {
+		// count up
+		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
+			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
+#ifdef GPU_PROFILE
+			nested_calls++;
+#endif
+			dim3 dimGridB(1,1,1);
+			if (*idx<=MAXDIMGRID) {
+				dimGridB.x = *idx;
+			}
+			else if (*idx<=MAXDIMGRID*NESTED_BLOCK_SIZE) {
+				dimGridB.x = MAXDIMGRID;
+				dimGridB.y = *idx/MAXDIMGRID+1;
+			}
+			else {
+				printf("Too many elements in queue\n");
+			}
+			gclr_block_queue_kernel<<<dimGridB, NESTED_BLOCK_SIZE>>>(vertexArray, edgeArray, color,
+																	color_type, nodeNumber,buffer, idx);
+		}
+	}
+}
+
+/* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
+__global__ void gclr_queue_cons_warp_dp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
 											int nodeNumber,	int *queue, unsigned int *queue_length, int *buffer)
 {
 	cudaStream_t s[MAX_STREAM_NUM];
@@ -555,7 +784,7 @@ __global__ void gclr_consolidate_warp_dp_kernel(int *vertexArray, int *edgeArray
 }
 
 /* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
-__global__ void gclr_consolidate_block_dp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
+__global__ void gclr_queue_cons_block_dp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
 											int nodeNumber,	int *queue, unsigned int *qLength, int *buffer)
 {
 	cudaStream_t s;
@@ -612,7 +841,7 @@ __global__ void gclr_consolidate_block_dp_kernel(int *vertexArray, int *edgeArra
 }
 
 /* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
-__global__ void gclr_consolidate_grid_dp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
+__global__ void gclr_queue_cons_grid_dp_kernel(int *vertexArray, int *edgeArray, int *color, int color_type,
 												int nodeNumber,	int *queue, unsigned int *qLength, int *buffer,
 												unsigned int *idx, unsigned int *count)
 {
@@ -691,6 +920,8 @@ __global__ void gclr_consolidate_grid_dp_kernel(int *vertexArray, int *edgeArray
 	}
 }
 
+
+
 __global__ void gen_queue_workset_kernel(	int *color, int *queue, unsigned int *queue_length,
 											unsigned int queue_max_length, int nodeNumber)
 {
@@ -723,5 +954,14 @@ __global__ void gen_dual_queue_workset_kernel(int *vertexArray, int *color, int 
 		}
 	}
 }
+
+__global__ void check_workset_kernel(int *color, unsigned int *nonstop, int nodeNumber)
+{
+	int tid = blockIdx.x *blockDim.x + threadIdx.x;
+	if ( tid<nodeNumber && color[tid]==0 ) {
+		*nonstop = 1;
+	}
+}
+
 
 #endif
