@@ -22,11 +22,16 @@ void usage() {
 	fprintf(stderr, "                 0 - no pruning\n");
 	fprintf(stderr, "                 1 - unordered + thread queue\n");
 	fprintf(stderr, "                 2 - dual queue\n");
-	fprintf(stderr, "                 3 - shared delayed buffer\n");
-	fprintf(stderr, "                 4 - global delayed buffer\n");
-	fprintf(stderr, "                 5 - multiple dynamic parallelism per block\n");
-	fprintf(stderr, "                 6 - single dynamic parallelism per block\n");
-	fprintf(stderr, "                 7 - workload consolidation for dynamic parallelism\n");
+	fprintf(stderr, "                 3 - bitmap shared delayed buffer\n");
+	fprintf(stderr, "                 4 - bitmap global delayed buffer\n");
+	fprintf(stderr, "                 5 - bitmap multiple dynamic parallelism per block\n");
+	fprintf(stderr, "                 6 - bitmap single dynamic parallelism per block\n");
+	fprintf(stderr, "                 7 - bitmap workload cons for dynamic parallelism\n");
+	fprintf(stderr, "                 8 - queue shared delayed buffer\n");
+	fprintf(stderr, "                 9 - queue global delayed buffer\n");
+	fprintf(stderr, "                 10 - queue multiple dynamic parallelism per block\n");
+	fprintf(stderr, "                 11 - queue single dynamic parallelism per block\n");
+	fprintf(stderr, "                 12 - queue workload cons for dynamic parallelism\n");
 	fprintf(stderr, "    --device,-e <number>               select the device\n");
 }
 
