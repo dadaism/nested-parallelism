@@ -23,6 +23,14 @@ typedef struct conf {
 
 extern CONF config;
 
+extern double start_time;
+extern double end_time;
+extern double init_time;
+extern double d_malloc_time;
+extern double h2d_memcpy_time;
+extern double ker_exe_time;
+extern double d2h_memcpy_time;
+
 void BFS_REC_GPU();
 
 #endif

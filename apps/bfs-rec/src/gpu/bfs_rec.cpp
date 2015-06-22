@@ -1,8 +1,18 @@
 #include "bfs_rec.h"
 
+#define N 10
+
 using namespace std;
 
 CONF config;
+
+double start_time = 0;
+double end_time = 0;
+double init_time = 0;
+double d_malloc_time = 0;
+double h2d_memcpy_time = 0;
+double ker_exe_time = 0;
+double d2h_memcpy_time = 0;
 
 void usage() {
 	fprintf(stderr,"\n");
@@ -171,11 +181,13 @@ int main(int argc, char* argv[])
 	//starts execution
 	printf("\n===MAIN=== :: [num_nodes,num_edges] = %u, %u\n", noNodeTotal, noEdgeTotal);
 
-	setArrays(noNodeTotal, graph.levelArray, UNDEFINED);
-	graph.levelArray[source] = 0;
 	/* Recursive BFS on GPU */
-	BFS_REC_GPU();
-	
+	for (int i=0; i<N; ++i) {
+		setArrays(noNodeTotal, graph.levelArray, UNDEFINED);
+		graph.levelArray[source] = 0;
+		BFS_REC_GPU();
+	}
+
 	int *levelArray_cpu = new int[noNodeTotal];
 	setArrays(noNodeTotal, levelArray_cpu, UNDEFINED);
 	levelArray_cpu[source] = 0;
@@ -187,6 +199,15 @@ int main(int argc, char* argv[])
 	} printf("\n");*/
 	
 	validateArrays(noNodeTotal, graph.levelArray, levelArray_cpu, "GPU bfs rec");
+
+	
+    if (VERBOSE) {
+		fprintf(stdout, "===MAIN=== :: CUDA runtime init:\t\t%.2lf ms.\n", init_time/N);
+		fprintf(stdout, "===MAIN=== :: CUDA device cudaMalloc:\t\t%.2lf ms.\n", d_malloc_time/N);
+		fprintf(stdout, "===MAIN=== :: CUDA H2D cudaMemcpy:\t\t%.2lf ms.\n", h2d_memcpy_time/N);
+		fprintf(stdout, "===MAIN=== :: CUDA kernel execution:\t\t%.2lf ms.\n", ker_exe_time/N);
+		fprintf(stdout, "===MAIN=== :: CUDA D2H cudaMemcpy:\t\t%.2lf ms.\n", d2h_memcpy_time/N);
+	}   
 
 	clear();
 	return 0;

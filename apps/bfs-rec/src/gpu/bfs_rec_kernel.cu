@@ -6,12 +6,10 @@
 #define MAX_THREAD_PER_BLOCK 1024
 
 #define WARP_SIZE 32
-#define THREASHOLD 150
 #define SHM_BUFF_SIZE 256
-#define NESTED_BLOCK_SIZE 128
 
 #ifndef THREADS_PER_BLOCK // nested kernel block size
-#define THREADS_PER_BLOCK 32
+#define THREADS_PER_BLOCK 256
 #endif
 
 #if (PROFILE_GPU!=0)
@@ -196,7 +194,7 @@ __global__ void bfs_kernel_dp_warp_cons(int *vertexArray, int *edgeArray, int *l
 }
 
 // recursive BFS traversal with block-level consolidation
-__global__ void bfs_kernel_dp_block_old_cons(int *vertexArray, int *edgeArray, int *levelArray, 
+__global__ void bfs_kernel_dp_block_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *buffer, unsigned int *idx) {
 #if (PROFILE_GPU!=0)
 	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
@@ -227,9 +225,13 @@ __global__ void bfs_kernel_dp_block_old_cons(int *vertexArray, int *edgeArray, i
 	__syncthreads();
 	if (threadIdx.x==0 && sh_idx>0) {
 	//	printf("Launch kernel with %d - %d = %d blocks\n", sh_idx, ori_idx, sh_idx-ori_idx);
-		bfs_kernel_dp_block_old_cons<<<sh_idx, THREADS_PER_BLOCK>>>(vertexArray, 
+		bfs_kernel_dp_block_cons<<<sh_idx, THREADS_PER_BLOCK>>>(vertexArray, 
 									 	edgeArray, levelArray, sh_buffer, 
 										buffer, idx);
+#ifdef FORCE_SYNC
+		cudaDeviceSynchronize();
+		free(sh_buffer);
+#endif
 	}
 
 	// no post work require
@@ -237,7 +239,7 @@ __global__ void bfs_kernel_dp_block_old_cons(int *vertexArray, int *edgeArray, i
 
 
 // recursive BFS traversal with block-level consolidation
-__global__ void bfs_kernel_dp_block_cons(int *vertexArray, int *edgeArray, int *levelArray, 
+__global__ void bfs_kernel_dp_block_old_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *buffer, unsigned int *idx) {
 #if (PROFILE_GPU!=0)
 	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
@@ -268,7 +270,7 @@ __global__ void bfs_kernel_dp_block_cons(int *vertexArray, int *edgeArray, int *
 	__syncthreads();
 	if (threadIdx.x==0 && sh_idx>ori_idx) {
 		//printf("Launch kernel with %d - %d = %d blocks\n", sh_idx, ori_idx, sh_idx-ori_idx);
-		bfs_kernel_dp_block_cons<<<sh_idx-ori_idx, THREADS_PER_BLOCK>>>(vertexArray, 
+		bfs_kernel_dp_block_old_cons<<<sh_idx-ori_idx, THREADS_PER_BLOCK>>>(vertexArray, 
 									 	edgeArray, levelArray, buffer+ori_idx, 
 										buffer, idx);
 	}
@@ -351,6 +353,11 @@ __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *l
 
 			bfs_kernel_dp_grid_cons<<<dimGrid, THREADS_PER_BLOCK>>>(vertexArray, edgeArray,
 								levelArray, buffer, idx, queue, qidx, count);
+	
+#ifdef FORCE_SYNC
+			cudaDeviceSynchronize();
+			free(sh_buffer);
+#endif
 		}
 	}
 
