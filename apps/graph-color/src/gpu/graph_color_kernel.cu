@@ -4,10 +4,10 @@
 #define MAXDIMGRID 65535
 #define MAXDIMBLOCK 1024
 
-#define THREASHOLD 512
+#define THREASHOLD 64
 #define SHM_BUFF_SIZE 256
-#define NESTED_BLOCK_SIZE 32
-#define MAX_STREAM_NUM 8
+#define NESTED_BLOCK_SIZE 64
+#define MAX_STREAM_NUM 1
 
 __device__ unsigned int gm_idx_pool[MAXDIMGRID*MAXDIMBLOCK/WARP_SIZE];
 
@@ -93,7 +93,7 @@ __global__ void gclr_block_queue_kernel(int *vertexArray, int *edgeArray, int *c
    - in phase 2, the blocks access the nodes in the delayed-buffer in a block-based mapping (one neighbor per thread)
 */
 __global__ void gclr_bitmap_shared_delayed_buffer_kernel(int *vertexArray, int *edgeArray, int *color,
-														unsigned int *nonstop, int color_type, int nodeNumber )
+														int color_type, int nodeNumber )
 {
 
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -119,10 +119,7 @@ __global__ void gclr_bitmap_shared_delayed_buffer_kernel(int *vertexArray, int *
 					flag = false;	break;
 				}
 			}
-			if (flag) {
-				color[tid] = color_type;
-				*nonstop = 1;
-			}
+			if (flag)	color[tid] = color_type;
 		}
 		else {	//	insert into delayed buffer
 			t_idx = atomicInc(&idx, SHM_BUFF_SIZE);
@@ -156,7 +153,6 @@ __global__ void gclr_bitmap_shared_delayed_buffer_kernel(int *vertexArray, int *
 		__syncthreads();
 		if (threadIdx.x==0 && flag) {
 			color[curr] = color_type;
-			*nonstop = 1;
 		}
 	}
 }
@@ -239,7 +235,7 @@ __global__ void gclr_queue_shared_delayed_buffer_kernel(int *vertexArray, int *e
    - phase 2 must be implemented by separately invoking the "process_buffer" kernel
 */
 __global__ void gclr_bitmap_global_delayed_buffer_kernel(int *vertexArray, int *edgeArray, int *color,
-														unsigned int *nonstop, int color_type, int *buffer, 
+														int color_type, int *buffer, 
 														unsigned int *idx, int nodeNumber )
 {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -260,10 +256,7 @@ __global__ void gclr_bitmap_global_delayed_buffer_kernel(int *vertexArray, int *
 					flag = false; break;
 				}
 			}
-			if (flag) {
-				color[tid] = color_type;
-				*nonstop = 1;
-			}
+			if (flag) color[tid] = color_type;
 		}
 		else {
 			t_idx = atomicInc(idx, GM_BUFF_SIZE);
@@ -349,8 +342,7 @@ __global__ void process_neighbors(int curr, int *edgeArray, int *color,
 }
 
 __global__ void gclr_bitmap_multidp_kernel(int *vertexArray, int *edgeArray, int *color,
-											unsigned int *nonstop, int color_type, 
-											int nodeNumber)
+											int color_type, int nodeNumber)
 {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
  	

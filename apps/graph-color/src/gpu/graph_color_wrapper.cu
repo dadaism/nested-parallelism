@@ -8,7 +8,7 @@
 #define WARP_SIZE 32
 
 #ifndef CONSOLIDATE_LEVEL
-#define CONSOLIDATE_LEVEL 1
+#define CONSOLIDATE_LEVEL 0
 #endif
 
 #include "graph_color_kernel.cu"
@@ -255,8 +255,9 @@ void gclr_shared_delayed_buffer_gpu()
 	while (nonstop) {
 		cudaCheckError( __LINE__, cudaMemset(d_nonstop, 0, sizeof(unsigned int)));
 		gclr_bitmap_shared_delayed_buffer_kernel<<<dimGrid, dimBlock>>>(d_vertexArray, d_edgeArray, d_colorArray,
-												  d_nonstop, color_type, noNodeTotal );
+												  color_type, noNodeTotal );
 		color_type++;
+		check_workset_kernel<<<dimGrid, dimBlock>>>(d_colorArray, d_nonstop, noNodeTotal);
 		cudaCheckError( __LINE__, cudaMemcpy( &nonstop, d_nonstop, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
 	}   
 
@@ -282,7 +283,7 @@ void gclr_global_delayed_buffer_gpu()
 		cudaCheckError( __LINE__, cudaMemset(d_nonstop, 0, sizeof(unsigned int)) );
 		cudaCheckError( __LINE__, cudaMemset(d_buffer_size, 0, sizeof(unsigned int)) );
 		gclr_bitmap_global_delayed_buffer_kernel<<<dimGrid, dimBlock>>>(	d_vertexArray, d_edgeArray, d_colorArray,
-																			d_nonstop, color_type, d_buffer, 
+																			color_type, d_buffer, 
 																			d_buffer_size, noNodeTotal );
 		cudaCheckError( __LINE__, cudaMemcpy(&buffer_size, d_buffer_size, sizeof(unsigned int), cudaMemcpyDeviceToHost ) );
 #ifdef CPU_PROFILE
@@ -304,10 +305,8 @@ void gclr_global_delayed_buffer_gpu()
 															noNodeTotal, d_buffer, d_buffer_size );
             
 		color_type++;
-		if (buffer_size!=0) 
-			nonstop = 1;
-		else
-			cudaCheckError( __LINE__, cudaMemcpy( &nonstop, d_nonstop, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
+		check_workset_kernel<<<dimGrid, dimBlock>>>(d_colorArray, d_nonstop, noNodeTotal);
+		cudaCheckError( __LINE__, cudaMemcpy( &nonstop, d_nonstop, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
 		
 		//if (DEBUG)
 		//	fprintf(stderr, "Iteration: %d  Buffer size: %d\n", color_type-1, buffer_size);
@@ -329,7 +328,7 @@ void gclr_np_naive_gpu()
 	while (nonstop) {
 		cudaCheckError( __LINE__, cudaMemset(d_nonstop, 0, sizeof(unsigned int)));
 		gclr_bitmap_multidp_kernel<<<dimGrid, dimBlock>>>(	d_vertexArray, d_edgeArray, d_colorArray, 
-															d_nonstop, color_type, noNodeTotal);
+															color_type, noNodeTotal);
 		color_type++;
 		check_workset_kernel<<<dimGrid, dimBlock>>>(d_colorArray, d_nonstop, noNodeTotal);
 		cudaCheckError( __LINE__, cudaMemcpy( &nonstop, d_nonstop, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
