@@ -5,5 +5,5 @@
 
 #./gpu-bfs-rec -f 2 -i ../../../../datasets/SLNDC/p2p-Gnutella08.txt -s 2
 #./gpu-bfs-rec -f 2 -i ../../../../datasets/SLNDC/p2p-Gnutella31.txt -s 3
-./gpu-bfs-rec -f 2 -i ../../../../datasets/SLNDC/p2p-Gnutella31.txt -s 2
-./gpu-bfs-rec -f 2 -i ../../../../datasets/SLNDC/p2p-Gnutella31.txt -s 3
+./gpu-bfs-rec -f 2 -i ../../../../datasets/SLNDC/p2p-Gnutella31.txt -v -s 2
+./gpu-bfs-rec -f 2 -i ../../../../datasets/SLNDC/p2p-Gnutella31.txt -v -s 3
