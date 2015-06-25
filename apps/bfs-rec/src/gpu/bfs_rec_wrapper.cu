@@ -184,10 +184,14 @@ void bfs_rec_dp_cons_gpu()
 	fprintf(stdout, "warp level consolidation\n");
 	bfs_kernel_dp_warp_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_buffer, d_idx);
+	//bfs_kernel_dp_warp_malloc_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
+	//											d_buffer, d_buffer, d_idx);
 #elif (CONSOLIDATE_LEVEL==1)
 	fprintf(stdout, "block level consolidation\n");
-	bfs_kernel_dp_block_old_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
+	bfs_kernel_dp_block_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_buffer, d_idx);
+	//bfs_kernel_dp_block_malloc_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
+	//											d_buffer, d_buffer, d_idx);
 #elif (CONSOLIDATE_LEVEL==2)
 	unsigned int *d_queue;
 	unsigned int *d_qidx;
@@ -198,6 +202,7 @@ void bfs_rec_dp_cons_gpu()
 	cudaCheckError(  __FILE__, __LINE__, cudaMemset( d_qidx, 0, sizeof(unsigned int)) );
 	cudaCheckError(  __FILE__, __LINE__, cudaMemset( d_count, 0, sizeof(unsigned int)) );
     fprintf(stdout, "grid level consolidation\n");
+	// by default, it utilize malloc 
 	bfs_kernel_dp_grid_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_idx, d_queue, d_qidx, d_count);
 #endif
