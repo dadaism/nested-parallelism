@@ -42,6 +42,7 @@ void print_conf() {
 		fprintf(stderr, "- Graph format: %d\n", config.data_set_format);
  	}
 	fprintf(stderr, "- Solution: %d\n", config.solution);
+	fprintf(stderr, "- GPU Device: %d\n", config.device_num);
 	if (config.verbose && config.debug) fprintf(stderr, "- verbose mode\n");
  	if (config.debug) fprintf(stderr, "- debug mode\n");
 }
