@@ -8,9 +8,6 @@
 #define WARP_SIZE 32
 #define SHM_BUFF_SIZE 256
 
-#ifndef THREADS_PER_BLOCK // nested kernel block size
-#define THREADS_PER_BLOCK 256
-#endif
 
 #if (PROFILE_GPU!=0)
 // records the number of kerbel calls performed
@@ -149,7 +146,7 @@ __global__ void  bfs_kernel_dp_cons_prepare(int *levelArray, unsigned int *buffe
 	//printf("%d\n", sizeof(unsigned int));
 }
 
-// recursive BFS traversal with block-level consolidation
+// recursive BFS traversal with warp-level consolidation
 __global__ void bfs_kernel_dp_warp_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *buffer, unsigned int *idx) {
 #if (PROFILE_GPU!=0)

@@ -1,6 +1,6 @@
 #include "bfs_rec.h"
 
-#define N 10
+#define N 1
 
 using namespace std;
 
@@ -134,6 +134,7 @@ void validateArrays(int n, int *array1, int *array2, const char *message)
 			break;
 		}
 	}
+	printf("PASS: %s !\n", message);
 }
 
 int main(int argc, char* argv[])

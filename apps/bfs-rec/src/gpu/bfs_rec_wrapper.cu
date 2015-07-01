@@ -2,8 +2,8 @@
 #include <cuda.h>
 #include "bfs_rec.h"
 
-#define QMAXLENGTH 10240000
-#define GM_BUFF_SIZE 10240000
+#define QMAXLENGTH 10240000*8
+#define GM_BUFF_SIZE 10240000*8
 
 #ifndef THREADS_PER_BLOCK_FLAT	//block size for flat parallelism
 #define THREADS_PER_BLOCK_FLAT 256
@@ -13,9 +13,15 @@
 #define NUM_BLOCKS_FLAT 256
 #endif
 
-#ifndef CONSOLIDATE_LEVEL
-#define CONSOLIDATE_LEVEL 1
+#ifndef THREADS_PER_BLOCK // nested kernel block size
+#define THREADS_PER_BLOCK 256
 #endif
+
+#ifndef CONSOLIDATE_LEVEL
+#define CONSOLIDATE_LEVEL 0
+#endif
+
+#define STREAMS 8
 
 #include "bfs_rec_kernel.cu"
 
@@ -31,15 +37,6 @@ unsigned int *d_nonstop;
 
 dim3 dimGrid(1,1,1);	// thread+bitmap
 dim3 dimBlock(1,1,1);	
-int maxDegreeT = 192;	// thread/block, thread+queue
-dim3 dimGridT(1,1,1);
-dim3 dimBlockT(maxDegreeT,1,1);
-
-int maxDegreeB = 32;
-dim3 dimBGrid(1,1,1);	// block+bitmap
-dim3 dimBBlock(maxDegreeB,1,1);		
-dim3 dimGridB(1,1,1);
-dim3 dimBlockB(maxDegreeB,1,1); // block+queue
 
 //char *update = new char [noNodeTotal] ();
 //int *queue = new int [queue_max_length];
@@ -62,7 +59,6 @@ void prepare_gpu()
 	end_time = gettime_ms();
 	init_time += end_time - start_time;
 
-	cudaCheckError( __FILE__, __LINE__, cudaSetDevice(config.device_num) );
 
 	if (DEBUG) {
 		fprintf(stderr, "Choose CUDA device: %d\n", config.device_num);
@@ -134,7 +130,8 @@ void bfs_flat_gpu()
 		level++;
 	}
 
-	printf("===> GPU #1 - flat parallelism.\n");
+	if (DEBUG)
+		printf("===> GPU #1 - flat parallelism.\n");
 	
 }
 
@@ -151,7 +148,8 @@ void bfs_rec_dp_naive_gpu()
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
 	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
 	
-	printf("===> GPU #2 - nested parallelism naive.\n");
+	if (DEBUG)
+		printf("===> GPU #2 - nested parallelism naive.\n");
 }
 
 // ----------------------------------------------------------
@@ -164,7 +162,8 @@ void bfs_rec_dp_hier_gpu()
 	bfs_kernel_dp_hier<<<children, THREADS_PER_BLOCK>>>(source, d_vertexArray, d_edgeArray, d_levelArray);
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
 	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
-	printf("===> GPU #3 - nested parallelism hierarchical.\n", gettime_ms()-start_time);
+	if (DEBUG)
+		printf("===> GPU #3 - nested parallelism hierarchical.\n", gettime_ms()-start_time);
 }
 
 // ----------------------------------------------------------
@@ -181,13 +180,15 @@ void bfs_rec_dp_cons_gpu()
 	
 	int children = 1;
 #if (CONSOLIDATE_LEVEL==0)
-	fprintf(stdout, "warp level consolidation\n");
+	if (DEBUG)
+		fprintf(stdout, "warp level consolidation\n");
 	bfs_kernel_dp_warp_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_buffer, d_idx);
 	//bfs_kernel_dp_warp_malloc_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 	//											d_buffer, d_buffer, d_idx);
 #elif (CONSOLIDATE_LEVEL==1)
-	fprintf(stdout, "block level consolidation\n");
+	if (DEBUG)
+		fprintf(stdout, "block level consolidation\n");
 	bfs_kernel_dp_block_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_buffer, d_idx);
 	//bfs_kernel_dp_block_malloc_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
@@ -201,7 +202,8 @@ void bfs_rec_dp_cons_gpu()
 	cudaCheckError(  __FILE__, __LINE__, cudaMalloc( &d_count, sizeof(unsigned int)) );
 	cudaCheckError(  __FILE__, __LINE__, cudaMemset( d_qidx, 0, sizeof(unsigned int)) );
 	cudaCheckError(  __FILE__, __LINE__, cudaMemset( d_count, 0, sizeof(unsigned int)) );
-    fprintf(stdout, "grid level consolidation\n");
+	if (DEBUG)
+    	fprintf(stdout, "grid level consolidation\n");
 	// by default, it utilize malloc 
 	bfs_kernel_dp_grid_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_idx, d_queue, d_qidx, d_count);
@@ -210,13 +212,15 @@ void bfs_rec_dp_cons_gpu()
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
 	cudaCheckError(  __FILE__, __LINE__, cudaDeviceSynchronize());
 	
-	printf("===> GPU #4 - nested parallelism consolidation.\n", end_time-start_time);
+	if (DEBUG)
+		printf("===> GPU #4 - nested parallelism consolidation.\n", end_time-start_time);
 	//gpu_print<<<1,1>>>(d_idx);
 	
 }
 
 void BFS_REC_GPU()
 {
+	cudaCheckError( __FILE__, __LINE__, cudaSetDevice(config.device_num) );
 	prepare_gpu();
 	
 #if (PROFILE_GPU!=0)
