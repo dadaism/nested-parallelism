@@ -22,6 +22,13 @@ __global__ void reset_gpu_statistics(){
 }
 #endif
 
+#if (CONSOLIDATE_LEVEL==2)
+
+__device__ unsigned int tmp_buffer[GM_BUFF_SIZE];
+__device__ unsigned int tmp_idx;
+
+#endif
+
 __global__ void gpu_print(unsigned int *idx)
 {
 	printf("index: %d\n", *idx);
@@ -318,12 +325,103 @@ __global__ void bfs_kernel_dp_block_malloc_cons(int *vertexArray, int *edgeArray
 		free(sh_buffer);
 #endif
 	}
-
 	// no post work require
 }
 
-// recursive BFS traversal with block-level consolidation
+__global__ void dp_grid_cons_init()
+{
+	tmp_idx = 0;
+}
+
+// recursive BFS traversal with grid-level consolidation
+// queue and buffer work like Ping-Pong pointer
 __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *levelArray, 
+									unsigned int *queue, unsigned int *qidx, 
+									unsigned int *buffer, unsigned int *idx,
+									unsigned int *count) 
+{
+#if (PROFILE_GPU!=0)
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) nestd_calls++;
+#endif
+	unsigned int bid = blockIdx.x; //+ blockIdx.y*gridDim.x; // 1-Dimensional grid configuration
+	unsigned int t_idx;
+	__shared__ unsigned int *sh_buffer;
+	__shared__ unsigned int sh_idx;
+	__shared__ unsigned int ori_idx;
+	__shared__ unsigned int offset;
+	int node = queue[bid];
+
+	unsigned int num_children = vertexArray[node+1]-vertexArray[node];
+	if (threadIdx.x==0) {
+		ori_idx = atomicAdd(&tmp_idx, num_children);
+		sh_idx = 0;
+		sh_buffer = tmp_buffer+ori_idx;
+	}
+	__syncthreads();
+
+	for (unsigned childp = threadIdx.x; childp < num_children; childp+=blockDim.x) {
+		int child = edgeArray[vertexArray[node]+childp];
+		unsigned node_level = levelArray[node];
+		unsigned child_level = levelArray[child];
+		if (child_level==UNDEFINED || child_level>(node_level+1)){
+			unsigned old_level = atomicMin(&levelArray[child], node_level+1);
+			t_idx = atomicInc(&sh_idx, GM_BUFF_SIZE);
+			sh_buffer[t_idx] = child;
+		}
+	}
+	__syncthreads();
+	// reorganize consolidation buffer for load balance ()
+	if (threadIdx.x==0) {
+		//offset = atomicAdd(qidx, sh_idx-ori_idx);
+		offset = atomicAdd(idx, sh_idx);
+	}
+	__syncthreads();
+	// dump block-level buffer to grid-level buffer
+	for (unsigned tid = threadIdx.x; tid<sh_idx; tid+=blockDim.x) {
+		int gm_idx = tid + offset;
+		buffer[gm_idx] = sh_buffer[tid];
+	}
+	__syncthreads();
+
+	// 2nd phase, grid level kernel launch
+	if (threadIdx.x==0) {
+		// count up
+		if (atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {
+#ifdef GPU_PROFILE
+			nested_calls++;
+#endif
+			//printf("Buffer size %d\n", *idx);
+			*count = 0;	// reset counter
+			*qidx = 0;	// reset next buffer index
+			tmp_idx = 0;
+			dim3 dimGrid(1,1,1);
+			if (*idx<=MAXDIMGRID) {
+				dimGrid.x = *idx;
+			}
+			/*else if (*idx<=MAXDIMGRID*THREADS_PER_BLOCK) {
+				dimGrid.x = MAXDIMGRID;
+				dimGrid.y = *idx/MAXDIMGRID+1;
+			}*/
+			else {
+				printf("%d \n", *idx);
+				printf("Too many elements in queue\n");
+			}
+
+			bfs_kernel_dp_grid_cons<<<dimGrid, THREADS_PER_BLOCK>>>(vertexArray, edgeArray,
+								levelArray, buffer, idx, queue, qidx, count);
+	
+//			bfs_kernel_dp_grid_cons<<<dimGrid, THREADS_PER_BLOCK>>>(vertexArray, edgeArray, 
+//								levelArray, buffer+ori_idx, qidx, buffer, idx, count);
+#ifdef FORCE_SYNC
+			cudaDeviceSynchronize();
+#endif
+		}
+	}
+	// no post work require
+}
+
+// recursive BFS traversal with grid-level consolidation
+__global__ void bfs_kernel_dp_grid_malloc_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *qidx, 
 								unsigned int *buffer, unsigned int *idx,
 								unsigned int *count) 
@@ -376,11 +474,13 @@ __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *l
 	if (threadIdx.x==0) {
 		free(sh_buffer);	// free allocated block buffer
 		// count up
-		if (atomicInc(count, MAXDIMGRID) >= (gridDim.x-1)) {
+		if (atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) && *idx!=0 ) {
 #ifdef GPU_PROFILE
 			nested_calls++;
 #endif
-			//printf("Buffer size %d\n", *idx);
+			printf("Buffer size %d\n", *idx);
+//			*count = malloc(sizeof(unsigned int));
+//			*qidx = malloc(sizeof(unsigned int));
 			*count = 0;	// reset counter
 			*qidx = 0;	// reset next buffer index
 			dim3 dimGrid(1,1,1);
@@ -395,7 +495,7 @@ __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *l
 				printf("Too many elements in queue\n");
 			}
 
-			bfs_kernel_dp_grid_cons<<<dimGrid, THREADS_PER_BLOCK>>>(vertexArray, edgeArray,
+			bfs_kernel_dp_grid_malloc_cons<<<dimGrid, THREADS_PER_BLOCK>>>(vertexArray, edgeArray,
 								levelArray, buffer, idx, queue, qidx, count);
 	
 #ifdef FORCE_SYNC
@@ -414,5 +514,6 @@ __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *l
 
 	// no post work require
 }
+
 
 #endif

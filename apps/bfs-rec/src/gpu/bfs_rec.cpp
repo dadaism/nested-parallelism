@@ -1,6 +1,6 @@
 #include "bfs_rec.h"
 
-#define N 1
+#define N 10
 
 using namespace std;
 
@@ -127,14 +127,15 @@ void setArrays(int size, int *arrays, int value)
 
 void validateArrays(int n, int *array1, int *array2, const char *message)
 {
+	int flag = 1;
 	for (int node=0; node<n; node++){
 		if (array1[node]!=array2[node]){
 			printf("ERROR: validation error at %lld: %s !\n", node, message);
-			//printf("Node %d : %d v.s. %d\n", node, array1[node], array2[node]);
-			break;
+			printf("Node %d : %d v.s. %d\n", node, array1[node], array2[node]);
+			flag = 0; break;
 		}
 	}
-	printf("PASS: %s !\n", message);
+	if (flag) printf("PASS: %s !\n", message);
 }
 
 int main(int argc, char* argv[])

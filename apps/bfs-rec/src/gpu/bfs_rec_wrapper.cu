@@ -2,11 +2,11 @@
 #include <cuda.h>
 #include "bfs_rec.h"
 
-#define QMAXLENGTH 10240000*8
-#define GM_BUFF_SIZE 10240000*8
+#define QMAXLENGTH 10240000*10
+#define GM_BUFF_SIZE 10240000*10
 
 #ifndef THREADS_PER_BLOCK_FLAT	//block size for flat parallelism
-#define THREADS_PER_BLOCK_FLAT 256
+#define THREADS_PER_BLOCK_FLAT 128
 #endif
 
 #ifndef NUM_BLOCKS_FLAT
@@ -14,14 +14,14 @@
 #endif
 
 #ifndef THREADS_PER_BLOCK // nested kernel block size
-#define THREADS_PER_BLOCK 256
+#define THREADS_PER_BLOCK 128
 #endif
 
 #ifndef CONSOLIDATE_LEVEL
-#define CONSOLIDATE_LEVEL 0
+#define CONSOLIDATE_LEVEL 2
 #endif
 
-#define STREAMS 8
+#define STREAMS 4
 
 #include "bfs_rec_kernel.cu"
 
@@ -59,28 +59,26 @@ void prepare_gpu()
 	end_time = gettime_ms();
 	init_time += end_time - start_time;
 
-
 	if (DEBUG) {
 		fprintf(stderr, "Choose CUDA device: %d\n", config.device_num);
 		fprintf(stderr, "cudaSetDevice:\t\t%lf\n",end_time-start_time);
 	}
-/*
+	
 	start_time = gettime_ms();
 	size_t limit = 0;
 	if (DEBUG) {
 		cudaCheckError( __FILE__, __LINE__, cudaDeviceGetLimit(&limit, cudaLimitMallocHeapSize));
 		printf("cudaLimistMallocHeapSize: %u\n", (unsigned)limit);
 	}
-	limit = 10240000*8;
+	limit = 102400000;
 	cudaCheckError( __FILE__, __LINE__, cudaDeviceSetLimit(cudaLimitMallocHeapSize, limit));
 	if (DEBUG) {
 		cudaCheckError( __FILE__, __LINE__, cudaDeviceGetLimit(&limit, cudaLimitMallocHeapSize));
 		printf("cudaLimistMallocHeapSize: %u\n", (unsigned)limit);
 	}
 	end_time = gettime_ms();
-	fprintf(stderr, "Set Heap Size:\t\t%.2lf ms.\n", end_time-start_time);
-*/
-	
+	//fprintf(stderr, "Set Heap Size:\t\t%.2lf ms.\n", end_time-start_time);
+
 	/* Allocate GPU memory */
 	start_time = gettime_ms();
 	cudaCheckError( __FILE__, __LINE__, cudaMalloc( (void**)&d_vertexArray, sizeof(int)*(noNodeTotal+1) ) );
@@ -194,6 +192,8 @@ void bfs_rec_dp_cons_gpu()
 	//bfs_kernel_dp_block_malloc_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 	//											d_buffer, d_buffer, d_idx);
 #elif (CONSOLIDATE_LEVEL==2)
+	// queue and buffer are different
+	// buffer stores the active working set
 	unsigned int *d_queue;
 	unsigned int *d_qidx;
 	unsigned int *d_count;
@@ -205,8 +205,12 @@ void bfs_rec_dp_cons_gpu()
 	if (DEBUG)
     	fprintf(stdout, "grid level consolidation\n");
 	// by default, it utilize malloc 
+	dp_grid_cons_init<<<1,1>>>();
 	bfs_kernel_dp_grid_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
 												d_buffer, d_idx, d_queue, d_qidx, d_count);
+/*	bfs_kernel_dp_grid_malloc_cons<<<children, THREADS_PER_BLOCK>>>(d_vertexArray, d_edgeArray, d_levelArray,
+												d_buffer, d_idx, d_queue, d_qidx, d_count);
+*/
 #endif
 
 	cudaCheckError(  __FILE__, __LINE__, cudaGetLastError());
@@ -215,12 +219,19 @@ void bfs_rec_dp_cons_gpu()
 	if (DEBUG)
 		printf("===> GPU #4 - nested parallelism consolidation.\n", end_time-start_time);
 	//gpu_print<<<1,1>>>(d_idx);
-	
+	cudaCheckError( __FILE__, __LINE__, cudaFree(d_buffer) );
+	cudaCheckError( __FILE__, __LINE__, cudaFree(d_idx) );
+#if (CONSOLIDATE_LEVEL==2)
+	cudaCheckError( __FILE__, __LINE__, cudaFree(d_queue) );
+	cudaCheckError( __FILE__, __LINE__, cudaFree(d_qidx) );
+	cudaCheckError( __FILE__, __LINE__, cudaFree(d_count) );
+#endif
 }
 
 void BFS_REC_GPU()
 {
 	cudaCheckError( __FILE__, __LINE__, cudaSetDevice(config.device_num) );
+	cudaCheckError( __FILE__, __LINE__, cudaDeviceReset());
 	prepare_gpu();
 	
 #if (PROFILE_GPU!=0)
