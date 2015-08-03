@@ -19,6 +19,7 @@
 gpu-*
 cpu-*
 *.o
+*.a
 run_tree*
 graph-gen
 
