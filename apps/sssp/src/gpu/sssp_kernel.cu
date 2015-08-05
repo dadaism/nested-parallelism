@@ -310,7 +310,7 @@ __global__ void unorder_threadQueue_single_dp_kernel( int *vertexArray, int *edg
         }
 }
 
-/* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
+/* thread queue with dynamic parallelism and a single nested kernel call per thread-warp */
 __global__ void consolidate_warp_dp_kernel( int *vertexArray, int *edgeArray, int *costArray, int *weightArray,
                                                   char *update, int nodeNumber, int *queue, unsigned int *queue_length,
                                                   int *buffer)
