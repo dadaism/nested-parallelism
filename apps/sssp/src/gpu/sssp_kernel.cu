@@ -247,7 +247,7 @@ __global__ void unorder_threadQueue_multiple_dp_kernel(	int *vertexArray, int *e
 		}
 		else {
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomic(nested_calls, INF);
 		//	printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
 		int costCurr = costArray[curr];
@@ -303,7 +303,7 @@ __global__ void unorder_threadQueue_single_dp_kernel( int *vertexArray, int *edg
     //2nd phase - nested kernel call
 	if (threadIdx.x==0 && *block_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomic(nested_calls, INF);
 #endif
       	sssp_process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>( vertexArray, edgeArray, weightArray, costArray,
         						  		update, nodeNumber, buffer+block_offset, *block_index);
@@ -357,7 +357,7 @@ __global__ void consolidate_warp_dp_kernel( int *vertexArray, int *edgeArray, in
     //2nd phase - nested kernel call
 	if (threadIdx.x%WARP_SIZE==0 && *warp_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
       	sssp_process_buffer<<<*warp_index,NESTED_BLOCK_SIZE,0, s[warpId%MAX_STREAM_NUM]>>>( vertexArray, edgeArray, weightArray, costArray,
         						  		update, nodeNumber, buffer+warp_offset, *warp_index);
@@ -416,7 +416,7 @@ __global__ void consolidate_block_dp_kernel( int *vertexArray, int *edgeArray, i
     //2nd phase - nested kernel call
 	if (threadIdx.x==0 && *block_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
       	sssp_process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>( vertexArray, edgeArray, weightArray, costArray,
         						  		update, nodeNumber, buffer+block_offset, *block_index);
@@ -484,7 +484,7 @@ __global__ void consolidate_grid_dp_kernel( int *vertexArray, int *edgeArray, in
 		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
 			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 #endif
 			dim3 dimGridB(1,1,1);
 			if (*idx<=MAXDIMGRID) {
