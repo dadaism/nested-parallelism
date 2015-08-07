@@ -40,7 +40,7 @@ __device__ unsigned int gm_idx_pool[2000][1];
 // iterative, flat BFS traversal (note: synchronization-free implementation)
 __global__ void bfs_kernel_flat(int level, int num_nodes, int *vertexArray, int *edgeArray, int *levelArray, bool *queue_empty){
 #if (PROFILE_GPU!=0)
-	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) atomicInc(nested_calls, INF);
 #endif
 	unsigned tid = threadIdx.x + blockDim.x * blockIdx.x;
 	for (int node = tid; node < num_nodes; node +=blockDim.x * gridDim.x){
@@ -59,7 +59,7 @@ __global__ void bfs_kernel_flat(int level, int num_nodes, int *vertexArray, int 
 // recursive naive NFS traversal
 __global__ void bfs_kernel_dp(int node, int *vertexArray, int *edgeArray, int *levelArray){
 #if (PROFILE_GPU!=0)
-	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) atomicInc(nested_calls, INF);
 #endif
 
 #if (STREAMS!=0)
@@ -90,7 +90,7 @@ __global__ void bfs_kernel_dp(int node, int *vertexArray, int *edgeArray, int *l
 // recursive hierarchical BFS traversal
 __global__ void bfs_kernel_dp_hier(int node, int *vertexArray, int *edgeArray, int *levelArray){
 #if (PROFILE_GPU!=0)
-	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) atomicInc(nested_calls, INF);
 #endif
 
 #if (STREAMS!=0)
@@ -157,7 +157,7 @@ __global__ void  bfs_kernel_dp_cons_prepare(int *levelArray, unsigned int *buffe
 __global__ void bfs_kernel_dp_warp_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *buffer, unsigned int *idx) {
 #if (PROFILE_GPU!=0)
-	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) atomicInc(nested_calls, INF);
 #endif
 	unsigned int bid = blockIdx.x; // 1-Dimensional grid configuration
 	unsigned int t_idx;
@@ -201,7 +201,7 @@ __global__ void bfs_kernel_dp_warp_cons(int *vertexArray, int *edgeArray, int *l
 __global__ void bfs_kernel_dp_warp_malloc_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *buffer, unsigned int *idx) {
 #if (PROFILE_GPU!=0)
-	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) atomicInc(nested_calls, INF);
 #endif
 	unsigned int bid = blockIdx.x; // 1-Dimensional grid configuration
 	unsigned int t_idx;
@@ -249,7 +249,7 @@ __global__ void bfs_kernel_dp_warp_malloc_cons(int *vertexArray, int *edgeArray,
 __global__ void bfs_kernel_dp_block_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *buffer, unsigned int *idx) {
 #if (PROFILE_GPU!=0)
-	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) atomicInc(nested_calls, INF);
 #endif
 	unsigned int bid = blockIdx.x; // 1-Dimensional grid configuration
 	unsigned int t_idx;
@@ -289,7 +289,7 @@ __global__ void bfs_kernel_dp_block_cons(int *vertexArray, int *edgeArray, int *
 __global__ void bfs_kernel_dp_block_malloc_cons(int *vertexArray, int *edgeArray, int *levelArray, 
 								unsigned int *queue, unsigned int *buffer, unsigned int *idx) {
 #if (PROFILE_GPU!=0)
-	if (threadIdx.x+blockDim.x*blockIdx.x==0) nested_calls++;
+	if (threadIdx.x+blockDim.x*blockIdx.x==0) atomicInc(nested_calls, INF);
 #endif
 	unsigned int bid = blockIdx.x; // 1-Dimensional grid configuration
 	unsigned int t_idx;
@@ -388,7 +388,7 @@ __global__ void bfs_kernel_dp_grid_cons(int *vertexArray, int *edgeArray, int *l
 		// count up
 		if (atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 #endif
 			//printf("Buffer size %d\n", *idx);
 			*count = 0;	// reset counter
@@ -476,7 +476,7 @@ __global__ void bfs_kernel_dp_grid_malloc_cons(int *vertexArray, int *edgeArray,
 		// count up
 		if (atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) && *idx!=0 ) {
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 #endif
 			printf("Buffer size %d\n", *idx);
 //			*count = malloc(sizeof(unsigned int));
