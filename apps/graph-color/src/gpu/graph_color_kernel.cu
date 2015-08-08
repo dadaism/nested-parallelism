@@ -369,7 +369,7 @@ __global__ void gclr_bitmap_multidp_kernel(int *vertexArray, int *edgeArray, int
 		}
 		else {
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 			//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
      		process_neighbors<<<1, NESTED_BLOCK_SIZE,0, s[threadIdx.x%MAX_STREAM_NUM]>>>(tid, edgeArray, color, color_type, start, end);
@@ -408,7 +408,7 @@ __global__ void gclr_queue_multidp_kernel(int *vertexArray, int *edgeArray, int 
 		}
 		else {
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 			//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
      		process_neighbors<<<1, NESTED_BLOCK_SIZE,0, s[threadIdx.x%MAX_STREAM_NUM]>>>(curr, edgeArray, color, color_type, start, end);
@@ -480,7 +480,7 @@ __global__ void gclr_bitmap_singledp_kernel(int *vertexArray, int *edgeArray, in
 	//2nd phase - nested kernel call
 	if (threadIdx.x==0 && block_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 		process_buffer<<<block_index,NESTED_BLOCK_SIZE>>>( vertexArray, edgeArray, color, color_type,
 															nodeNumber, buffer+block_offset, block_index);
@@ -530,7 +530,7 @@ __global__ void gclr_queue_singledp_kernel(int *vertexArray, int *edgeArray, int
 	//2nd phase - nested kernel call
 	if (threadIdx.x==0 && block_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 		process_buffer<<<block_index,NESTED_BLOCK_SIZE>>>( vertexArray, edgeArray, color, color_type,
 															nodeNumber, buffer+block_offset, block_index);
@@ -582,7 +582,7 @@ __global__ void gclr_bitmap_cons_warp_dp_kernel(int *vertexArray, int *edgeArray
 	//2nd phase - nested kernel call
 	if (threadIdx.x%WARP_SIZE==0 && *warp_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 		process_buffer<<<*warp_index,NESTED_BLOCK_SIZE,0, s[warpId%MAX_STREAM_NUM]>>>( vertexArray, edgeArray, color, color_type,
 															nodeNumber, buffer+warp_offset, *warp_index);
@@ -637,7 +637,7 @@ __global__ void gclr_bitmap_cons_block_dp_kernel(int *vertexArray, int *edgeArra
 	//2nd phase - nested kernel call
 	if (threadIdx.x==0 && *block_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 		process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>( vertexArray, edgeArray, color, color_type,
 															nodeNumber, buffer+block_offset, *block_index);
@@ -702,7 +702,7 @@ __global__ void gclr_bitmap_cons_grid_dp_kernel(int *vertexArray, int *edgeArray
 		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
 			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 #endif
 			dim3 dimGridB(1,1,1);
 			if (*idx<=MAXDIMGRID) {
@@ -768,7 +768,7 @@ __global__ void gclr_queue_cons_warp_dp_kernel(int *vertexArray, int *edgeArray,
 	//2nd phase - nested kernel call
 	if (threadIdx.x%WARP_SIZE==0 && *warp_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 		process_buffer<<<*warp_index,NESTED_BLOCK_SIZE,0, s[warpId%MAX_STREAM_NUM]>>>( vertexArray, edgeArray, color, color_type,
 															nodeNumber, buffer+warp_offset, *warp_index);
@@ -825,7 +825,7 @@ __global__ void gclr_queue_cons_block_dp_kernel(int *vertexArray, int *edgeArray
 	//2nd phase - nested kernel call
 	if (threadIdx.x==0 && *block_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 		process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>( vertexArray, edgeArray, color, color_type,
 															nodeNumber, buffer+block_offset, *block_index);
@@ -893,7 +893,7 @@ __global__ void gclr_queue_cons_grid_dp_kernel(int *vertexArray, int *edgeArray,
 		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
 			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 #endif
 			dim3 dimGridB(1,1,1);
 			if (*idx<=MAXDIMGRID) {
