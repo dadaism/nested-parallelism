@@ -228,7 +228,7 @@ __global__ void backward_multidp_kernel(int *vertexArray, int *edgeArray, int *l
 		}
 		else {
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 			//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
 			bp_process_neighbors<<<edge_num/NESTED_BLOCK_SIZE+1, NESTED_BLOCK_SIZE>>>(edgeArray, level, p, sigma, delta, dist, nodeNumber, tid, start, end);
@@ -300,7 +300,7 @@ __global__ void backward_singledp_kernel(int *vertexArray, int *edgeArray, int *
 	// 2nd phase - nested kernel call
 	if (threadIdx.x==0 && block_index!=0) {
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 		//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
 		bp_process_buffer<<<block_index, NESTED_BLOCK_SIZE>>>(vertexArray, edgeArray, level, p, sigma, delta, dist, nodeNumber, buffer+block_offset, block_index);
@@ -350,7 +350,7 @@ __global__ void backward_warp_dp_kernel(int *vertexArray, int *edgeArray, int *l
 	//2nd phase - nested kernel call
 	if (threadIdx.x%WARP_SIZE==0 && warp_index[warpId]!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
       	bp_process_buffer<<<warp_index[warpId],NESTED_BLOCK_SIZE,0, s[threadIdx.x%MAX_STREAM_NUM]>>>(
       														vertexArray, edgeArray, level,
@@ -405,7 +405,7 @@ __global__ void backward_block_dp_kernel(int *vertexArray, int *edgeArray, int *
 	// 2nd phase - nested kernel call
 	if (threadIdx.x==0 && block_index!=0) {
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 		//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
 		bp_process_buffer<<<block_index,NESTED_BLOCK_SIZE,0,s>>>(vertexArray, edgeArray, level, p, sigma, delta, dist, nodeNumber, buffer+block_offset, block_index);
@@ -467,7 +467,7 @@ __global__ void backward_grid_dp_kernel(int *vertexArray, int *edgeArray, int *l
 		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
 			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 #endif
 			dim3 dimGridB(1,1,1);
 			if (*idx<=MAXDIMGRID) {

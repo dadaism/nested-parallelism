@@ -280,7 +280,7 @@ __global__ void forward_bfs_thread_queue_multidp_kernel(int *vertexArray, int *e
 		}
 		else {
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 			//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
 			process_neighbors<<<edge_num/NESTED_BLOCK_SIZE+1, NESTED_BLOCK_SIZE>>>(edgeArray, level, update, sigma, p, dist, nodeNumber, curr, start, end);
@@ -360,7 +360,7 @@ __global__ void forward_bfs_thread_queue_singledp_kernel(int *vertexArray, int *
 	// 2nd phase - nested kernel call
 	if (threadIdx.x==0 && block_index!=0) {
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 		//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
 		process_buffer<<<block_index, NESTED_BLOCK_SIZE>>>(vertexArray, edgeArray, level, update, sigma, p, dist, nodeNumber, buffer+block_offset, block_index);
@@ -416,7 +416,7 @@ __global__ void forward_bfs_warp_dp_kernel(int *vertexArray, int *edgeArray, int
 	//2nd phase - nested kernel call
 	if (threadIdx.x%WARP_SIZE==0 && warp_index[warpId]!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 		process_buffer<<<warp_index[warpId],NESTED_BLOCK_SIZE,0, s[threadIdx.x%MAX_STREAM_NUM]>>>(
 														vertexArray, edgeArray, level,
@@ -478,7 +478,7 @@ __global__ void forward_bfs_block_dp_kernel(int *vertexArray, int *edgeArray, in
 	// 2nd phase - nested kernel call
 	if (threadIdx.x==0 && block_index!=0) {
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 		//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
 		process_buffer<<<block_index, NESTED_BLOCK_SIZE, 0, s>>>(vertexArray, edgeArray, level, update,
@@ -550,7 +550,7 @@ __global__ void forward_bfs_grid_dp_kernel(int *vertexArray, int *edgeArray, int
 		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
 			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 #endif
 			dim3 dimGridB(1,1,1);
 			if (*idx<=MAXDIMGRID) {
