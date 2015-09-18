@@ -19,6 +19,7 @@ __global__ void gpu_statistics(unsigned solution){
 #endif
 
 __device__ unsigned int gm_idx_pool[MAXDIMGRID*MAXDIMBLOCK/WARP_SIZE];
+__device__ unsigned int *gm_buffer_pool[MAXDIMGRID*MAXDIMBLOCK/WARP_SIZE];
 
 __global__ void unorder_threadQueue_kernel(	int *vertexArray, int *edgeArray, int *costArray, int *weightArray,
 											char *update, int nodeNumber, int *queue,unsigned int *qLength)
@@ -322,16 +323,27 @@ __global__ void consolidate_warp_dp_kernel( int *vertexArray, int *edgeArray, in
 	int warpId = threadIdx.x / WARP_SIZE;
 	int warpDim = blockDim.x / WARP_SIZE;
 	int total_warp_num = gridDim.x * warpDim;
-	unsigned per_warp_buffer = GM_BUFF_SIZE/total_warp_num; 	// amount of the buffer available to each thread block
-	unsigned warp_offset = (blockIdx.x * warpDim + warpId) * per_warp_buffer;  // block offset within the buffer
+	unsigned warp_buffer_size = GM_BUFF_SIZE/total_warp_num; 	// amount of the buffer available to each warp
+	unsigned int **warp_buffer = &gm_buffer_pool[blockIdx.x * warpDim + warpId];	 // index of each block within its sub-buffer
+	unsigned int *warp_index = &gm_idx_pool[blockIdx.x * warpDim + warpId];	 // index of each block within its sub-buffer
+#if BUFFER_ALLOCATOR == 0  // default
+	if (threadIdx.x%WARP_SIZE==0) {
+		*warp_buffer = (unsigned int*)malloc(sizeof(unsigned int)*warp_buffer_size);
+	}
 
-	unsigned int *warp_index = &gm_idx_pool[blockIdx.x * warpDim + warpId];				// index of each block within its sub-buffer
+#elif BUFFER_ALLOCATOR == 1  // halloc
+
+#else  // customized allocator
+	unsigned warp_buffer_size = GM_BUFF_SIZE/total_warp_num; 	// amount of the buffer available to each thread block
+	unsigned warp_offset = (blockIdx.x * warpDim + warpId) * warp_buffer_size;  // block offset within the buffer
+	*warp_buffer = &buffer[warp_offset];
+#endif
 	int t_idx = 0;						// used to access the buffer
 	*warp_index = 0;
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
     // 1st phase
     if ( tid<*queue_length ) {
-        int curr = queue[tid];  //      grab a work from queue, tid is queue index
+        int curr = queue[tid];  // grab a work from queue, tid is queue index
         /* get neighbor range */
         int start = vertexArray[curr];
         int end = vertexArray[curr+1];
@@ -344,13 +356,13 @@ __global__ void consolidate_warp_dp_kernel( int *vertexArray, int *edgeArray, in
                 int alt = costCurr + weightArray[i];
                 if ( costArray[nid] > alt ) {
         	         atomicMin(costArray+nid, alt);
-                     update[nid] = 1;        // update neighbour needed
+						update[nid] = 1;        // update neighbour needed
                 }
             }
         }
         else { // insert into delayed buffer in global memory
-        	t_idx = atomicInc(warp_index, per_warp_buffer);
-            buffer[t_idx+warp_offset] = queue[tid];
+        	t_idx = atomicInc(warp_index, warp_buffer_size);
+			*warp_buffer[t_idx] = queue[tid];
         }
 	}
 
@@ -360,7 +372,7 @@ __global__ void consolidate_warp_dp_kernel( int *vertexArray, int *edgeArray, in
 		atomicInc(nested_calls, INF);
 #endif
       	sssp_process_buffer<<<*warp_index,NESTED_BLOCK_SIZE,0, s[warpId%MAX_STREAM_NUM]>>>( vertexArray, edgeArray, weightArray, costArray,
-        						  		update, nodeNumber, buffer+warp_offset, *warp_index);
+        						  		update, nodeNumber, warp_buffer, *warp_index);
 	}
 }
 
@@ -371,10 +383,21 @@ __global__ void consolidate_block_dp_kernel( int *vertexArray, int *edgeArray, i
 {
 	cudaStream_t s;
 	cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
-	unsigned per_block_buffer = GM_BUFF_SIZE/gridDim.x; 	// amount of the buffer available to each thread block
-	unsigned block_offset = blockIdx.x * per_block_buffer;  // block offset within the buffer
-    __shared__ int shm_buffer[MAXDIMBLOCK];
+	unsigned block_buffer_size = GM_BUFF_SIZE/gridDim.x; 	// amount of the buffer available to each thread block
+	unsigned block_offset = blockIdx.x * block_buffer_size;  // block offset within the buffer
+   __shared__ int *block_buffer;
 	unsigned int *block_index = &gm_idx_pool[blockIdx.x];	// index of each block within its sub-buffer
+	unsigned int block_buffer_size = MAXDIMBLOCK;
+
+#if BUFFER_ALLOCATOR == 0  // default
+	if (threadIdx.x==0) {
+		block_buffer = (unsigned int*)malloc(sizeof(unsigned int)*warp_buffer_size);
+	}
+#elif BUFFER_ALLOCATOR == 1 // halloc
+
+#else	// customized allocator
+
+#endif
 	int t_idx = 0;						// used to access the buffer
 	if (threadIdx.x == 0) *block_index = 0;
 	__syncthreads();
@@ -400,7 +423,7 @@ __global__ void consolidate_block_dp_kernel( int *vertexArray, int *edgeArray, i
             }
         }
         else { // insert into delayed buffer in global memory
-        	t_idx = atomicInc(block_index, per_block_buffer);
+        	t_idx = atomicInc(block_index, block_buffer_size);
             //buffer[t_idx+block_offset] = queue[tid];
         	shm_buffer[t_idx] = queue[tid];
         }
