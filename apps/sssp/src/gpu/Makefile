@@ -14,6 +14,10 @@ CC_FLAGS = --compiler-options '-fopenmp' -arch=sm_35 -rdc=true -lcudadevrt -O2
 
 #CC_FLAGS += -DTHREASHOLD=400
 
+HALLOC_FLAGS = -I../../../../lib/halloc -L../../../../lib
+
+CC_FLAGS += ${HALLOC_FLAGS}
+
 INC = -I./ -I../../../../common
 
 all: global.o gpu-sssp
@@ -21,7 +25,7 @@ all: global.o gpu-sssp
 global.o: ../../../../common/global.cpp
 	${CC} ${FLAGS} ${INC} -c $^ -o $@
 gpu-sssp: global.o sssp.cpp sssp_wrapper.cu sssp_kernel.cu
-	$(CC) -D'CONSOLIDATE_LEVEL=1' $(CC_FLAGS) ${INC} global.o sssp.cpp sssp_wrapper.cu -o $@
+	$(CC) -D'CONSOLIDATE_LEVEL=1' -D'BUFFER_ALLOCATOR=2' $(CC_FLAGS) ${INC} -lhalloc global.o sssp.cpp sssp_wrapper.cu -o $@
 
 clean:
 	rm *.o gpu-sssp*

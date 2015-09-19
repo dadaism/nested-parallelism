@@ -68,6 +68,7 @@ __global__ void check_delta_kernel(FLOAT_T *rankArray, FLOAT_T *newRankArray, un
 	}
 }
 
+
 __global__ void update_danglingrankarray_kernel(FLOAT_T *rankArray, FLOAT_T *danglingRankArray, int *danglingVertexArray, int noDanglingNode)
 {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -332,10 +333,16 @@ __global__  void pg_multidp_kernel(	int *child_vertex_array, int *r_edge_array, 
 			atomicInc(nested_calls, INF);
 			//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
+			//if (tid==18929 || tid==18867)
+			//printf("Node %d: old %f  new %f  \n", tid, rank_array[tid], new_rank_array[tid]);
 			new_rank_array[tid] = 0.0;
      		pg_process_neighbors<<<edge_num/NESTED_BLOCK_SIZE+1, NESTED_BLOCK_SIZE, 0, s[threadIdx.x%MAX_STREAM_NUM]>>>(
 							r_edge_array, outdegree_array, rank_array, new_rank_array, 
 							rank_random_walk, rank_dangling_node, damping, start, end, tid);
+			
+			cudaDeviceSynchronize();
+			//if (tid==18929 || tid==18867)
+			//printf("Node %d with %d edges : old %f  new %f  \n", tid, end-start, rank_array[tid], new_rank_array[tid]);
 		} 
 	}  
 }

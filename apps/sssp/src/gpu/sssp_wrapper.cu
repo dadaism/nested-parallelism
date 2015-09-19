@@ -2,6 +2,8 @@
 #include <cuda.h>
 #include "sssp.h"
 
+#include "halloc.h"
+
 #define INF 1073741824	// 1024*1024*1024
 #define QMAXLENGTH 10240000
 #define GM_BUFF_SIZE 10240000
@@ -55,6 +57,7 @@ inline void cudaCheckError(int line, cudaError_t ce)
 
 void prepare_gpu()
 {
+	cudaDeviceReset();
 	start_time = gettime();
 	cudaFree(NULL);
 	end_time = gettime();
@@ -111,6 +114,29 @@ void prepare_gpu()
 	end_time = gettime();
 	h2d_memcpy_time += end_time - start_time;
 	
+	/* Initialize GPU allocator */
+	start_time = gettime_ms();
+#if BUFFER_ALLOCATOR == 0 // default
+ 	size_t limit = 0;
+ 	if (DEBUG) {
+		cudaCheckError( __LINE__, cudaDeviceGetLimit(&limit, cudaLimitMallocHeapSize));
+ 		printf("cudaLimistMallocHeapSize: %u\n", (unsigned)limit);
+ 	}
+ 	limit = GM_BUFF_SIZE*32; // don't understand why need multiplied by 10 (otherwise crash)
+ 	cudaCheckError( __LINE__, cudaDeviceSetLimit(cudaLimitMallocHeapSize, limit));
+ 	if (DEBUG) {
+ 		cudaCheckError( __LINE__, cudaDeviceGetLimit(&limit, cudaLimitMallocHeapSize));
+ 		printf("cudaLimistMallocHeapSize: %u\n", (unsigned)limit);
+	}
+#elif BUFFER_ALLOCATOR == 1 // halloc
+	size_t memory = GM_BUFF_SIZE*16;
+	ha_init(halloc_opts_t(memory));
+#else
+
+#endif
+ 	end_time = gettime_ms();
+ 	//fprintf(stderr, "Set Heap Size:\t\t%.2lf ms.\n", end_time-start_time);
+
 }
 
 void clean_gpu()
@@ -492,14 +518,17 @@ void sssp_np_consolidate_gpu()
 															d_work_queue, d_queue_length, d_buffer,
 															d_bSize, d_count);
 #endif
+		cudaCheckError( __LINE__, cudaGetLastError());
 		cudaCheckError( __LINE__, cudaMemset(d_queue_length, 0, sizeof(unsigned int)));
 		unorder_generateQueue_kernel<<<dimGrid, dimBlock>>>(d_update, noNodeTotal, d_work_queue,
 															d_queue_length, queue_max_length);
 
+		cudaCheckError( __LINE__, cudaGetLastError());
 
 		cudaCheckError( __LINE__, cudaMemcpy(&queue_length,d_queue_length,sizeof(unsigned int), cudaMemcpyDeviceToHost));
 		iteration++;
 	}
+	printf("iteration: %d\n", iteration);	
 	cudaCheckError( __LINE__, cudaFree(d_work_queue) );
 	cudaCheckError( __LINE__, cudaFree(d_queue_length) );
 	cudaCheckError( __LINE__, cudaFree(d_buffer) );

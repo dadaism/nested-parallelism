@@ -504,7 +504,8 @@ void pg_np_naive_gpu()
 		d_newRankArray = d_temp;
 
 		iteration++;
-		if (iteration==37) break; // there is a precision bug in this implementation
+		//printf("Iteration: %d\n", iteration);
+		if (iteration==37)  break; // there is precision bug in this implementation
 		// 37 is for CiteSeer only
 	}
 	if (DEBUG)
@@ -555,7 +556,7 @@ void pg_np_opt_gpu()
 
 		iteration++;
 	}
-	if (DEBUG)
+	//if (DEBUG)
 		fprintf(stderr, "PageRank ends in %d iterations.\n", iteration); 
 
 	cudaFree(d_buffer);
