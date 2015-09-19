@@ -329,7 +329,7 @@ __global__  void pg_multidp_kernel(	int *child_vertex_array, int *r_edge_array, 
    		}
 		else {
 #ifdef GPU_PROFILE
-			//nested_calls++;
+			atomicInc(nested_calls, INF);
 			//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
 			new_rank_array[tid] = 0.0;
@@ -410,7 +410,7 @@ __global__ void pg_singledp_kernel(int *child_vertex_array, int *r_edge_array, i
 	__syncthreads();
 	if (threadIdx.x==0 && *block_index!=0){
 #ifdef GPU_PROFILE
-		//nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 		// each node is processed by single block, blockIdx.x == block_index
 		pg_process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>(	child_vertex_array, r_edge_array, outdegree_array,
@@ -466,7 +466,7 @@ __global__ void pg_warp_dp_kernel(int *child_vertex_array, int *r_edge_array, in
 	//2nd phase - nested kernel call
 	if (threadIdx.x%WARP_SIZE==0 && *warp_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 	    pg_process_buffer<<<*warp_index, NESTED_BLOCK_SIZE,0,s[threadIdx.x%MAX_STREAM_NUM]>>>(	child_vertex_array, r_edge_array, outdegree_array,
 	      																	rank_array, new_rank_array, rank_random_walk,
@@ -524,7 +524,7 @@ __global__ void pg_block_dp_kernel(int *child_vertex_array, int *r_edge_array, i
 	__syncthreads();
 	if (threadIdx.x==0 && *block_index!=0){
 #ifdef GPU_PROFILE
-		//nested_calls++;
+		atomicInc(nested_calls, INF);
 #endif
 		// each node is processed by single block, blockIdx.x == block_index
 		pg_process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>(	child_vertex_array, r_edge_array, outdegree_array,
@@ -594,7 +594,7 @@ __global__ void pg_grid_dp_kernel(int *child_vertex_array, int *r_edge_array, in
 		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
 			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomicInc(nested_calls, INF);
 #endif
 			dim3 dimGridB(1,1,1);
 			if (*idx<=MAXDIMGRID) {

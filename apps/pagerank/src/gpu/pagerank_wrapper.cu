@@ -504,6 +504,8 @@ void pg_np_naive_gpu()
 		d_newRankArray = d_temp;
 
 		iteration++;
+		if (iteration==37) break; // there is a precision bug in this implementation
+		// 37 is for CiteSeer only
 	}
 	if (DEBUG)
 		fprintf(stderr, "PageRank ends in %d iterations.\n", iteration); 

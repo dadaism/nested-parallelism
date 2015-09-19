@@ -271,7 +271,7 @@ __global__ void csr_spmv_multidp_kernel(int *ptr, int *indices, FLOAT_T *data, F
 		}
 		else {
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomic(nested_calls, INF);
 			//  printf("calling nested kernel for %d neighbors\n", edgeNum);
 #endif
      		spmv_process_neighbors<<<edge_num/NESTED_BLOCK_SIZE+1, NESTED_BLOCK_SIZE,0,s[threadIdx.x%MAX_STREAM_NUM]>>>(
@@ -341,7 +341,7 @@ __global__ void csr_spmv_singledp_kernel(int *ptr, int *indices, FLOAT_T *data, 
 	//2nd phase - nested kernel call
 	if (threadIdx.x==0 && *block_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomic(nested_calls, INF);
 #endif
 		spmv_process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>( ptr, indices, data, x, y, node_num,
 																buffer+block_offset, *block_index);
@@ -389,7 +389,7 @@ __global__ void csr_spmv_warp_dp_kernel(int *ptr, int *indices, FLOAT_T *data, F
 	//2nd phase - nested kernel call
 	if (threadIdx.x%WARP_SIZE==0 && *warp_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomic(nested_calls, INF);
 #endif
 		spmv_process_buffer<<<*warp_index,NESTED_BLOCK_SIZE,0,s[threadIdx.x%MAX_STREAM_NUM]>>>( ptr, indices, data, x, y, node_num,
 																buffer+warp_offset, *warp_index);
@@ -440,7 +440,7 @@ __global__ void csr_spmv_block_dp_kernel(int *ptr, int *indices, FLOAT_T *data, 
 	//2nd phase - nested kernel call
 	if (threadIdx.x==0 && *block_index!=0){
 #ifdef GPU_PROFILE
-		nested_calls++;
+		atomic(nested_calls, INF);
 #endif
 		spmv_process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>( ptr, indices, data, x, y, node_num,
 																buffer+block_offset, *block_index);
@@ -500,7 +500,7 @@ __global__ void csr_spmv_grid_dp_kernel(int *ptr, int *indices, FLOAT_T *data, F
 		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
 			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
 #ifdef GPU_PROFILE
-			nested_calls++;
+			atomic(nested_calls, INF);
 #endif
 			dim3 dimGridB(1,1,1);
 			if (*idx<=MAXDIMGRID) {
