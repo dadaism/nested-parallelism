@@ -466,6 +466,67 @@ __global__ void consolidate_block_dp_kernel( int *vertexArray, int *edgeArray, i
 
 /* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
 __global__ void consolidate_grid_dp_kernel( int *vertexArray, int *edgeArray, int *costArray, int *weightArray,
+                                            char *update, int nodeNumber, int *queue, unsigned int *queue_length,
+                                            int *buffer, unsigned int *idx, unsigned int *count)
+{
+	cudaStream_t s;
+	cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
+
+	int t_idx = 0;						// used to access the buffer
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        // 1st phase
+    if ( tid<*queue_length ) {
+        int curr = queue[tid];  //      grab a work from queue, tid is queue index
+        /* get neighbour range */
+        int start = vertexArray[curr];
+        int end = vertexArray[curr+1];
+        int edgeNum = end - start;
+        if ( edgeNum<THRESHOLD ) {
+            /* access neighbours */
+            int costCurr = costArray[curr];
+            for (int i=start; i<end; ++i) {
+     	        int nid = edgeArray[i];
+                int alt = costCurr + weightArray[i];
+                if ( costArray[nid] > alt ) {
+        	         atomicMin(costArray+nid, alt);
+                     update[nid] = 1;        // update neighbour needed
+                }
+            }
+        }
+        else { // insert into delayed buffer in global memory
+        	t_idx = atomicInc(idx, GM_BUFF_SIZE);
+        	buffer[t_idx] = queue[tid];
+        }
+	}
+	__syncthreads();
+	// 2nd phase, grid level consolidation
+	if (threadIdx.x==0) {
+		// count up
+		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
+			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
+#ifdef GPU_PROFILE
+			atomicInc(nested_calls, INF);
+#endif
+			dim3 dimGridB(1,1,1);
+			if (*idx<=MAXDIMGRID) {
+				dimGridB.x = *idx;
+			}
+			else if (*idx<=MAXDIMGRID*NESTED_BLOCK_SIZE) {
+				dimGridB.x = MAXDIMGRID;
+				dimGridB.y = *idx/MAXDIMGRID+1;
+			}
+			else {
+				printf("Too many elements in queue\n");
+			}
+			unorder_blockQueue_kernel<<<dimGridB, NESTED_BLOCK_SIZE,0,s>>>(	vertexArray, edgeArray, costArray,
+																		weightArray, update, nodeNumber,
+																		buffer, idx);
+		}
+	}
+}
+
+/* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
+__global__ void cons_grid_dp_complex_kernel( int *vertexArray, int *edgeArray, int *costArray, int *weightArray,
                                                   char *update, int nodeNumber, int *queue, unsigned int *queue_length,
                                                   int *buffer, unsigned int *idx, unsigned int *count)
 {
