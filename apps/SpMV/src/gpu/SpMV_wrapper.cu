@@ -2,6 +2,8 @@
 #include <cuda.h>
 #include "SpMV.h"
 
+#include "halloc.h"
+
 #define QMAXLENGTH 10240000
 #define GM_BUFF_SIZE 10240000
 
@@ -54,6 +56,7 @@ inline void cudaCheckError(int line, cudaError_t ce)
 
 void prepare_gpu()
 {	
+	cudaDeviceReset();
 	start_time = gettime();
 	cudaFree(NULL);
 	end_time = gettime();
@@ -117,6 +120,17 @@ void prepare_gpu()
 	cudaCheckError( __LINE__, cudaMemset(d_y, 0, sizeof(FLOAT_T)*noNodeTotal) );
 	end_time = gettime();
 	h2d_memcpy_time += end_time-start_time;
+
+	/* Initialize GPU allocator */
+#if BUFFER_ALLOCATOR == 0 // default 
+	size_t limit = GM_BUFF_SIZE * sizeof(int);
+	cudaCheckError( __LINE__, cudaDeviceSetLimit(cudaLimitMallocHeapSize, limit));
+#elif BUFFER_ALLOCATOR == 1 // halloc
+	size_t memory = GM_BUFF_SIZE * sizeof(int);
+	ha_init(halloc_opts_t(memory));
+#else
+
+#endif	
 }
 
 void clean_gpu()

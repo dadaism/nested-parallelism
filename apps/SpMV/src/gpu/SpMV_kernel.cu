@@ -5,7 +5,7 @@
 #define MAXDIMGRID 65535
 #define MAXDIMBLOCK 1024
 
-#define THREASHOLD 1024
+#define THREASHOLD 64
 #define SHM_BUFF_SIZE 256
 #define NESTED_BLOCK_SIZE 64
 #define MAX_STREAM_NUM 16
@@ -23,6 +23,7 @@ __global__ void gpu_statistics(unsigned solution){
 #endif
 
 __device__ unsigned int gm_idx_pool[MAXDIMGRID*MAXDIMBLOCK/WARP_SIZE];
+__device__ int *gm_buffer_pool[MAXDIMGRID*MAXDIMBLOCK/WARP_SIZE];
 
 __device__ double atomicAdd(double* address, double val) 
 { 
@@ -359,10 +360,22 @@ __global__ void csr_spmv_warp_dp_kernel(int *ptr, int *indices, FLOAT_T *data, F
 	int warpId = threadIdx.x / WARP_SIZE;
 	int warpDim = blockDim.x / WARP_SIZE;
 	int total_warp_num = gridDim.x * warpDim;
-	unsigned per_warp_buffer = GM_BUFF_SIZE/total_warp_num; 	// amount of the buffer available to each thread block
-	unsigned warp_offset = (blockIdx.x * warpDim + warpId) * per_warp_buffer;  // block offset within the buffer
-
+	//unsigned warp_buffer_size = GM_BUFF_SIZE/total_warp_num; 	// amount of the buffer available to each thread block
+	unsigned warp_buffer_size = 64; 	// amount of the buffer available to each thread block
+	int **warp_buffer = &gm_buffer_pool[blockIdx.x * warpDim + warpId];
 	unsigned int *warp_index = &gm_idx_pool[blockIdx.x * warpDim + warpId];		// index of each block within its sub-buffer
+#if BUFFER_ALLOCATOR == 0 // default
+	if (threadIdx.x%WARP_SIZE==0) {
+		*warp_buffer = (int*)malloc(sizeof(unsigned int)*warp_buffer_size);
+	}
+#elif BUFFER_ALLOCATOR == 1 // halloc
+	if (threadIdx.x%WARP_SIZE==0) {
+		*warp_buffer = (int*)hamalloc(sizeof(unsigned int)*warp_buffer_size);
+	}
+#else
+	unsigned warp_offset = (blockIdx.x * warpDim + warpId) * warp_buffer_size;  // block offset within the buffer
+	*warp_buffer = &buffer[warp_offset];
+#endif
 	int t_idx = 0;						// used to access the buffer
 	*warp_index = 0;
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -381,8 +394,8 @@ __global__ void csr_spmv_warp_dp_kernel(int *ptr, int *indices, FLOAT_T *data, F
 			y[tid] = dot;
 		}
 		else {
-			t_idx = atomicInc(warp_index, per_warp_buffer);
-			buffer[t_idx+warp_offset] = tid;
+			t_idx = atomicInc(warp_index, warp_buffer_size);
+			(*warp_buffer)[t_idx] = tid;
 		}
 	}
 	__syncthreads();
@@ -392,8 +405,18 @@ __global__ void csr_spmv_warp_dp_kernel(int *ptr, int *indices, FLOAT_T *data, F
 		atomic(nested_calls, INF);
 #endif
 		spmv_process_buffer<<<*warp_index,NESTED_BLOCK_SIZE,0,s[threadIdx.x%MAX_STREAM_NUM]>>>( ptr, indices, data, x, y, node_num,
-																buffer+warp_offset, *warp_index);
+																*warp_buffer, *warp_index);
+		cudaDeviceSynchronize();
 	}
+#if BUFFER_ALLOCATOR == 0 // default
+	if (threadIdx.x%WARP_SIZE==0) {
+		free(*warp_buffer);
+	}
+#elif BUFFER_ALLOCATOR == 1 // halloc
+	if (threadIdx.x%WARP_SIZE==0) {
+		hafree(*warp_buffer);
+	}
+#endif
 }
 
 /* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
@@ -402,10 +425,24 @@ __global__ void csr_spmv_block_dp_kernel(int *ptr, int *indices, FLOAT_T *data, 
 {
 	cudaStream_t s;
 	cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
-	unsigned per_block_buffer = GM_BUFF_SIZE/gridDim.x;     // amount of the buffer available to each thread block
-    unsigned block_offset = blockIdx.x * per_block_buffer;  // block offset within the buffer
-    __shared__ int shm_buffer[MAXDIMBLOCK];
+	//unsigned block_buffer_size = GM_BUFF_SIZE/gridDim.x;     // amount of the buffer available to each thread block
+	unsigned block_buffer_size = 2048;     // amount of the buffer available to each thread block
+    unsigned block_offset = blockIdx.x * block_buffer_size;  // block offset within the buffer
+    __shared__ int *block_buffer;
     unsigned int *block_index = &gm_idx_pool[blockIdx.x];                            // index of each block within its sub-buffer
+#if BUFFER_ALLOCATOR == 0 // default
+	if (threadIdx.x==0) {
+		block_buffer = (int*)malloc(sizeof(unsigned int)*block_buffer_size);
+	}
+#elif BUFFER_ALLOCATOR == 1
+	if (threadIdx.x==0) {
+		block_buffer = (int*)hamalloc(sizeof(unsigned int)*block_buffer_size);
+	}
+#else
+	if (threadIdx.x==0) {
+		block_buffer = &buffer[block_offset];
+	}
+#endif 
     int t_idx = 0;                                          // used to access the buffer
     if (threadIdx.x == 0) *block_index = 0;
     __syncthreads();
@@ -426,15 +463,9 @@ __global__ void csr_spmv_block_dp_kernel(int *ptr, int *indices, FLOAT_T *data, 
 			y[tid] = dot;
 		}
 		else {
-			t_idx = atomicInc(block_index, per_block_buffer);
-			shm_buffer[t_idx] = tid;
+			t_idx = atomicInc(block_index, block_buffer_size);
+			block_buffer[t_idx] = tid;
 		}
-	}
-	__syncthreads();
-	// dump shm_buffer to global buffer
-	if (threadIdx.x<*block_index) {
-		int idx = threadIdx.x + block_offset;
-		buffer[idx] = shm_buffer[threadIdx.x];
 	}
 	__syncthreads();
 	//2nd phase - nested kernel call
@@ -443,13 +474,73 @@ __global__ void csr_spmv_block_dp_kernel(int *ptr, int *indices, FLOAT_T *data, 
 		atomic(nested_calls, INF);
 #endif
 		spmv_process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>( ptr, indices, data, x, y, node_num,
-																buffer+block_offset, *block_index);
+																	buffer, *block_index);
+#if BUFFER_ALLOCATOR == 0 // default 
+		cudaDeviceSynchronize();
+		free(block_buffer);
+#elif BUFFER_ALLOCATOR == 1
+		cudaDeviceSynchronize();
+		hafree(block_buffer);
+#endif
+
 	}
 }
 
-
 /* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
 __global__ void csr_spmv_grid_dp_kernel(int *ptr, int *indices, FLOAT_T *data, FLOAT_T *x,
+										FLOAT_T *y, int node_num, int *buffer,
+										unsigned int *idx, unsigned int *count)
+{
+	cudaStream_t s;
+	cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
+	int t_idx = 0;						// used to access the buffer
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	// 1st phase
+	if ( tid<node_num){
+		FLOAT_T dot = 0;
+		/* get neighbour range */
+		int start = ptr[tid];
+		int end = ptr[tid+1];
+		int edge_num = end - start;
+		if ( edge_num < THREASHOLD ) {
+			/* access neighbours */
+			for (int i=start; i<end; ++i) {
+				dot += data[i] * x[indices[i]];
+			}
+			y[tid] = dot;
+		}
+		else {
+			t_idx = atomicInc(idx, GM_BUFF_SIZE);
+			buffer[t_idx] = tid;
+		}
+	}
+	// 2nd phase, grid level consolidation
+	if (threadIdx.x==0) {
+		// count up
+		if ( atomicInc(count, MAXDIMGRID) >= (gridDim.x-1) ) {//
+			//printf("gridDim.x: %d buffer: %d\n", gridDim.x, *idx);
+#ifdef GPU_PROFILE
+			atomic(nested_calls, INF);
+#endif
+			dim3 dimGridB(1,1,1);
+			if (*idx<=MAXDIMGRID) {
+				dimGridB.x = *idx;
+			}
+			else if (*idx<=MAXDIMGRID*NESTED_BLOCK_SIZE) {
+				dimGridB.x = MAXDIMGRID;
+				dimGridB.y = *idx/MAXDIMGRID+1;
+			}
+			else {
+				printf("Too many elements in queue\n");
+			}
+			csr_spmv_block_queue_kernel<<<dimGridB, NESTED_BLOCK_SIZE,0,s>>>(ptr, indices, buffer, idx,
+																			data, x, y, node_num );
+		}
+	}
+}
+
+/* thread queue with dynamic parallelism and a single nested kernel call per thread-block*/
+__global__ void csr_spmv_grid_dp_complex_kernel(int *ptr, int *indices, FLOAT_T *data, FLOAT_T *x,
 										FLOAT_T *y, int node_num, int *buffer,
 										unsigned int *idx, unsigned int *count)
 {
