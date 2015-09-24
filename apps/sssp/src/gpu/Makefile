@@ -24,7 +24,7 @@ all: global.o gpu-sssp
 
 global.o: ../../../../common/global.cpp
 	${CC} ${FLAGS} ${INC} -c $^ -o $@
-gpu-sssp: global.o sssp.cpp sssp_wrapper.cu sssp_kernel.cu
+gpu-sssp: Makefile global.o sssp.cpp sssp_wrapper.cu sssp_kernel.cu
 	$(CC) -D'CONSOLIDATE_LEVEL=1' -D'BUFFER_ALLOCATOR=2' $(CC_FLAGS) ${INC} -lhalloc global.o sssp.cpp sssp_wrapper.cu -o $@
 
 clean:
