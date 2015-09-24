@@ -7,7 +7,7 @@
 #define THRESHOLD 64
 #define SHM_BUFF_SIZE 256
 #define NESTED_BLOCK_SIZE 64
-#define MAX_STREAM_NUM 16
+#define MAX_STREAM_NUM 4
 
 #ifdef GPU_PROFILE
 
@@ -20,6 +20,16 @@ __global__ void gpu_statistics(unsigned solution){
 
 __device__ unsigned int gm_idx_pool[MAXDIMGRID*MAXDIMBLOCK/WARP_SIZE];
 __device__ int *gm_buffer_pool[MAXDIMGRID*MAXDIMBLOCK/WARP_SIZE];
+
+__global__ void single_malloc(int *buffer)
+{
+	buffer = (int*)malloc(sizeof(unsigned int)*GM_BUFF_SIZE);
+}
+
+__global__ void single_free(int *buffer)
+{
+	free(buffer);
+}
 
 __global__ void unorder_threadQueue_kernel(	int *vertexArray, int *edgeArray, int *costArray, int *weightArray,
 											char *update, int nodeNumber, int *queue,unsigned int *qLength)
@@ -49,7 +59,7 @@ __global__ void unorder_blockQueue_kernel(	int *vertexArray, int *edgeArray, int
 {
 	int bid = blockIdx.x + blockIdx.y * gridDim.x; //*MAX_THREAD_PER_BLOCK + threadIdx.x;	
 	int frontierNo = *qLength;
-	if ( bid<frontierNo ) {
+	for ( ; bid<frontierNo; bid += gridDim.x * gridDim.y ) {
 		int curr = queue[bid];	//	grab a work from queue, tid is queue index
 		/* get neighbour range */				
 		int start = vertexArray[curr];
@@ -73,7 +83,7 @@ __global__ void sssp_process_buffer( int *vertexArray, int *edgeArray, int *weig
 				     char *update, int nodeNumber, int *buffer, unsigned int buffer_length)
 {
 	int bid = blockIdx.x; 
-	if ( bid<buffer_length ) {   // block-based mapping
+	for (; bid<buffer_length; bid += gridDim.x ) {   // block-based mapping
 		int curr = buffer[bid];	//nodes processed by current block
 		/* get neighbour range */				
 		int start = vertexArray[curr];
@@ -207,8 +217,8 @@ __global__ void sssp_process_neighbors(	int *edgeArray, int *weightArray, int *c
 					char *update, int costCurr, int start, int end)
 {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x + start;
-	if (tid < end) {
-       		int nid = edgeArray[tid];
+	for (; tid < end; tid += gridDim.x * blockDim.x ) {
+       	int nid = edgeArray[tid];
 		int alt = costCurr + weightArray[tid];
 		if ( costArray[nid] > alt ) {
 			atomicMin(costArray+nid, alt);
@@ -216,6 +226,8 @@ __global__ void sssp_process_neighbors(	int *edgeArray, int *weightArray, int *c
 		}
 	}
 }
+
+
 
 /* thread queue with dynamic parallelism and potentially multiple nested kernel calls */
 __global__ void unorder_threadQueue_multiple_dp_kernel(	int *vertexArray, int *edgeArray, int *costArray, int *weightArray,
@@ -253,7 +265,10 @@ __global__ void unorder_threadQueue_multiple_dp_kernel(	int *vertexArray, int *e
 #endif
 		int costCurr = costArray[curr];
 
-		sssp_process_neighbors<<<edgeNum/NESTED_BLOCK_SIZE+1, NESTED_BLOCK_SIZE, 0, s[threadIdx.x%MAX_STREAM_NUM] >>>(
+		//sssp_process_neighbors<<<edgeNum/NESTED_BLOCK_SIZE+1, NESTED_BLOCK_SIZE, 0, s[threadIdx.x%MAX_STREAM_NUM] >>>(
+		//			 	 edgeArray, weightArray, costArray, update, costCurr, start, end);
+		//int num_block = edgeNum/NESTED_BLOCK_SIZE < 2 ? edgeNum/NESTED_BLOCK_SIZE : 2;
+		sssp_process_neighbors<<<1, NESTED_BLOCK_SIZE, 0, s[threadIdx.x%MAX_STREAM_NUM] >>>(
 					 	 edgeArray, weightArray, costArray, update, costCurr, start, end);
 
 		}
@@ -452,6 +467,7 @@ __global__ void consolidate_block_dp_kernel( int *vertexArray, int *edgeArray, i
 		atomicInc(nested_calls, INF);
 #endif
       	sssp_process_buffer<<<*block_index,NESTED_BLOCK_SIZE,0,s>>>( vertexArray, edgeArray, weightArray, costArray,
+      	//sssp_process_buffer<<<1,NESTED_BLOCK_SIZE,0,s>>>( vertexArray, edgeArray, weightArray, costArray,
         						  		update, nodeNumber, block_buffer, *block_index);
   
 #if BUFFER_ALLOCATOR == 0  // default
@@ -471,7 +487,6 @@ __global__ void consolidate_grid_dp_kernel( int *vertexArray, int *edgeArray, in
 {
 	cudaStream_t s;
 	cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking);
-
 	int t_idx = 0;						// used to access the buffer
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
         // 1st phase

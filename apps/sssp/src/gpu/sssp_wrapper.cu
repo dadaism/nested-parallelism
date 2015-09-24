@@ -12,7 +12,7 @@
 #define THREADS_PER_BLOCK 192
 
 #ifndef CONSOLIDATE_LEVEL
-#define CONSOLIDATE_LEVEL 1
+#define CONSOLIDATE_LEVEL 0
 #endif
 
 #include "sssp_kernel.cu"
@@ -122,7 +122,7 @@ void prepare_gpu()
 		cudaCheckError( __LINE__, cudaDeviceGetLimit(&limit, cudaLimitMallocHeapSize));
  		printf("cudaLimistMallocHeapSize: %u\n", (unsigned)limit);
  	}
- 	limit = GM_BUFF_SIZE*32; // don't understand why need multiplied by 10 (otherwise crash)
+ 	limit = GM_BUFF_SIZE*sizeof(unsigned int); // don't understand why need multiplied by 10 (otherwise crash)
  	cudaCheckError( __LINE__, cudaDeviceSetLimit(cudaLimitMallocHeapSize, limit));
  	if (DEBUG) {
  		cudaCheckError( __LINE__, cudaDeviceGetLimit(&limit, cudaLimitMallocHeapSize));
@@ -513,10 +513,15 @@ void sssp_np_consolidate_gpu()
 
 		cudaCheckError( __LINE__, cudaMemset(d_bSize, 0, sizeof(unsigned int)));
 		cudaCheckError( __LINE__, cudaMemset(d_count, 0, sizeof(unsigned int)));
+		int *test_buffer;
+		cudaCheckError( __LINE__, cudaMalloc( (void**)&test_buffer, sizeof(int*)) );
+		single_malloc<<<1,1>>>(test_buffer);
 		consolidate_grid_dp_kernel<<<dimGridT, dimBlockT>>>(d_vertexArray, d_edgeArray, d_costArray,
 															d_weightArray, d_update, noNodeTotal,
 															d_work_queue, d_queue_length, d_buffer,
 															d_bSize, d_count);
+
+		single_free<<<1,1>>>(test_buffer);
 /*
 		cons_grid_dp_complex_kernel<<<dimGridT, dimBlockT>>>(d_vertexArray, d_edgeArray, d_costArray,
 															d_weightArray, d_update, noNodeTotal,
